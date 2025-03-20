@@ -1,15 +1,23 @@
 # 介绍
-## 使用数据集
-### 训练集：[DailyDelhiClimateTrain.csv](other/DailyDelhiClimateTrain.csv)
-### 测试集：[DailyDelhiClimateTest.csv](other/DailyDelhiClimateTest.csv)
-## 代码
-### 模型训练：[test.py](other/test.py)
-### 预测7天后气象指标：[predict_next_week.py](other/predict_next_week.py)
-### 测试CUDA状态：[testcuda.py](testcuda.py)
-## 模型
-### 由 [test.py](other/test.py) 训练完成的LSTM模型：[weather_lstm_model.pth](other/weather_lstm_model.pth)
-## 文件
-### 测试数据的 Tensor 文件，存储了 X_test，用于模型评估和预测：[X_test_tensor.pth](other/X_test_tensor.pth)
-### 数据归一化文件：[scaler.pkl](other/scaler.pkl)
-### 目标变量的归一化参数：[scaler_y.pkl](other/scaler_y.pkl)
+## 主要文件夹：
+## [Beijing](Beijing) 北京天气
+#### [Beijing_Weather_Train.csv](Beijing/Beijing_Weather_Train.csv) 北京天气数据训练集
+#### [Beijing_Weather_Test.csv](Beijing/Beijing_Weather_Test.csv) 北京天气数据测试集
+### [ModelTrain_Beijing.py](Beijing/ModelTrain_Beijing.py) 北京天气模型训练
+### [predict_next_week_B.py](Beijing/predict_next_week_B.py) 预测北京下周的天气
+
+## [London](London) 伦敦天气
+#### [London_Weather_Train.csv](London/London_Weather_Train.csv) 伦敦天气数据训练集
+#### [London_Weather_Test.csv](London/London_Weather_Test.csv) 伦敦天气数据测试集
+### [ModelTrain_London.py](London/ModelTrain_London.py) 伦敦天气模型训练
+### [predict_next_week_L.py](London/predict_next_week_L.py) 预测伦敦下周的天气
+
+## [other](other) 前期训练杂项（可删除）
+## [testcuda.py](testcuda.py) 检测cuda环境
+
+
+
+
+
+
 
