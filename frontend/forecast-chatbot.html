@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast Assistant</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --background-color: #f5f7fa;
+            --chat-bg: #ffffff;
+            --user-msg-bg: #e1f0fa;
+            --bot-msg-bg: #f0f2f5;
+            --text-color: #333333;
+            --light-text: #7f8c8d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .header {
+            text-align: center;
+            padding: 15px 0;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: var(--primary-color);
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .header p {
+            color: var(--light-text);
+            margin: 5px 0 0 0;
+        }
+
+        .main {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--chat-bg);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            line-height: 1.4;
+        }
+
+        .user-message {
+            align-items: flex-end;
+        }
+
+        .user-message .message-content {
+            background-color: var(--user-msg-bg);
+            color: var(--text-color);
+            border-bottom-right-radius: 5px;
+        }
+
+        .bot-message {
+            align-items: flex-start;
+        }
+
+        .bot-message .message-content {
+            background-color: var(--bot-msg-bg);
+            color: var(--text-color);
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: var(--light-text);
+            margin-top: 5px;
+        }
+
+        .bot-message .message-time {
+            margin-left: 10px;
+        }
+
+        .user-message .message-time {
+            margin-right: 10px;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-top: 1px solid #ddd;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .chat-input input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .chat-input button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 20px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        .chat-input button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: var(--chat-bg);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar h2 {
+            font-size: 18px;
+            color: var(--text-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .shortcuts {
+            margin-bottom: 20px;
+        }
+
+        .shortcut-btn {
+            display: block;
+            background-color: #f5f5f5;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+        }
+
+        .shortcut-btn:hover {
+            background-color: #e9ecef;
+        }
+
+        .shortcut-btn i {
+            margin-right: 8px;
+            color: var(--primary-color);
+        }
+
+        .suggestions {
+            margin-top: auto;
+        }
+
+        .suggestion-chip {
+            display: inline-block;
+            background-color: #f0f2f5;
+            border-radius: 16px;
+            padding: 6px 12px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .suggestion-chip:hover {
+            background-color: #e1e4e8;
+        }
+
+        .history {
+            margin-bottom: 20px;
+        }
+
+        .history-item {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+
+        .history-item:hover {
+            background-color: #f9f9f9;
+        }
+
+        .history-icon {
+            width: 24px;
+            color: var(--light-text);
+            margin-right: 10px;
+        }
+
+        .history-text {
+            flex: 1;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+            margin-left: 15px;
+            height: 20px;
+        }
+
+        .typing-dot {
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            background-color: var(--light-text);
+            margin-right: 4px;
+            animation: typing-animation 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing-animation {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .bot-actions {
+            display: flex;
+            margin-top: 8px;
+            margin-left: 15px;
+        }
+
+        .action-button {
+            background-color: #e1f0fa;
+            border: none;
+            border-radius: 5px;
+            padding: 6px 12px;
+            margin-right: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--primary-color);
+            transition: background-color 0.2s;
+        }
+
+        .action-button:hover {
+            background-color: #d0e7f7;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .main {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: auto;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Forecast Assistant</h1>
+            <p>Ask me about stocks, exchange rates, or weather forecasts</p>
+        </div>
+
+        <div class="main">
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Messages will be added here -->
+                </div>
+
+                <div class="chat-input">
+                    <input type="text" id="userInput" placeholder="Type your message here..." autocomplete="off">
+                    <button id="sendButton">Send</button>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <h2>Quick Actions</h2>
+                <div class="shortcuts">
+                    <button class="shortcut-btn" data-action="exchange">
+                        <i>💱</i> Exchange Rate Forecast
+                    </button>
+                    <button class="shortcut-btn" data-action="stock">
+                        <i>📈</i> Stock Price Forecast
+                    </button>
+                    <button class="shortcut-btn" data-action="weather">
+                        <i>🌤️</i> Weather Forecast
+                    </button>
+                </div>
+
+                <h2>Recent Searches</h2>
+                <div class="history" id="searchHistory">
+                    <!-- History items will be added here -->
+                </div>
+
+                <div class="suggestions">
+                    <h2>Try asking</h2>
+                    <div class="suggestion-chip" data-suggestion="What's the forecast for Apple stock?">What's the forecast for Apple stock?</div>
+                    <div class="suggestion-chip" data-suggestion="Show me USD to EUR exchange rate">USD to EUR exchange rate</div>
+                    <div class="suggestion-chip" data-suggestion="What's the weather in London?">Weather in London</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatMessages = document.getElementById('chatMessages');
+            const userInput = document.getElementById('userInput');
+            const sendButton = document.getElementById('sendButton');
+            const searchHistory = document.getElementById('searchHistory');
+
+            // Function to add a new message to the chat
+            function addMessage(content, isUser) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = isUser ? 'message user-message' : 'message bot-message';
+
+                const now = new Date();
+                const timeString = now.getHours().toString().padStart(2, '0') + ':' +
+                                   now.getMinutes().toString().padStart(2, '0');
+
+                messageDiv.innerHTML = `
+                    <div class="message-content">${content}</div>
+                    <div class="message-time">${timeString}</div>
+                `;
+
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Add to history if it's a user message
+                if (isUser && content.trim().length > 0) {
+                    addToHistory(content);
+                }
+            }
+
+            // Function to add typing indicator
+            function showTypingIndicator() {
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'message bot-message';
+                typingDiv.id = 'typingIndicator';
+
+                typingDiv.innerHTML = `
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                `;
+
+                chatMessages.appendChild(typingDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            // Function to remove typing indicator
+            function hideTypingIndicator() {
+                const typingIndicator = document.getElementById('typingIndicator');
+                if (typingIndicator) {
+                    typingIndicator.remove();
+                }
+            }
+
+            // Function to add message to history
+            function addToHistory(content) {
+                // Limit history to 5 items
+                const historyItems = searchHistory.querySelectorAll('.history-item');
+                if (historyItems.length >= 5) {
+                    historyItems[historyItems.length - 1].remove();
+                }
+
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                historyItem.innerHTML = `
+                    <div class="history-icon">🔍</div>
+                    <div class="history-text">${content}</div>
+                `;
+
+                historyItem.addEventListener('click', function() {
+                    userInput.value = content;
+                    sendMessage();
+                });
+
+                searchHistory.insertBefore(historyItem, searchHistory.firstChild);
+            }
+
+            // Function to add action buttons after bot message
+            function addActionButtons(type, specificData = null) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'bot-actions';
+
+                if (type === 'exchange') {
+                    actionsDiv.innerHTML = `
+                        <button class="action-button" data-link="/exchange">View exchange rate forecast</button>
+                        <button class="action-button" data-suggestion="Show me GBP to USD exchange rate">Try another currency</button>
+                    `;
+                } else if (type === 'stock') {
+                    actionsDiv.innerHTML = `
+                        <button class="action-button" data-link="/stocks">View stock price forecast</button>
+                        <button class="action-button" data-suggestion="Show me Microsoft stock forecast">Try another stock</button>
+                    `;
+                } else if (type === 'weather') {
+                    actionsDiv.innerHTML = `
+                        <button class="action-button" data-link="/weather">View weather forecast</button>
+                        <button class="action-button" data-suggestion="What's the weather in Tokyo?">Try another city</button>
+                    `;
+                }
+
+                chatMessages.appendChild(actionsDiv);
+
+                // Add event listeners to action buttons
+                actionsDiv.querySelectorAll('.action-button').forEach(button => {
+                    if (button.dataset.link) {
+                        button.addEventListener('click', function() {
+                            window.location.href = this.dataset.link;
+                        });
+                    } else if (button.dataset.suggestion) {
+                        button.addEventListener('click', function() {
+                            userInput.value = this.dataset.suggestion;
+                            sendMessage();
+                        });
+                    }
+                });
+            }
+
+            // Function to process user message and generate response
+            function processMessage(message) {
+                message = message.toLowerCase().trim();
+
+                // Show typing indicator
+                showTypingIndicator();
+
+                // Simulate delay for bot response
+                setTimeout(() => {
+                    hideTypingIndicator();
+
+                    // Keywords for different forecast types
+                    const exchangeKeywords = ['exchange', 'currency', 'forex', 'rate', 'usd', 'eur', 'gbp', 'jpy', 'cny', 'dollar', 'euro', 'pound', 'yen', 'yuan'];
+                    const stockKeywords = ['stock', 'share', 'equity', 'market', 'nasdaq', 'nyse', 'index', 'apple', 'microsoft', 'google', 'amazon', 'tesla', 'aapl', 'msft', 'googl', 'amzn', 'tsla'];
+                    const weatherKeywords = ['weather', 'forecast', 'temperature', 'rain', 'snow', 'sunny', 'cloudy', 'climate', 'humidity', 'wind', 'storm', 'celsius', 'fahrenheit'];
+
+                    let responseType = null;
+
+                    // Check which type of forecast is being requested
+                    for (const word of message.split(/\s+/)) {
+                        if (exchangeKeywords.includes(word)) {
+                            responseType = 'exchange';
+                            break;
+                        } else if (stockKeywords.includes(word)) {
+                            responseType = 'stock';
+                            break;
+                        } else if (weatherKeywords.includes(word)) {
+                            responseType = 'weather';
+                            break;
+                        }
+                    }
+
+                    // Generate appropriate response
+                    let response = '';
+
+                    if (responseType === 'exchange') {
+                        response = "I can help you with exchange rate forecasts. Our models predict currency movements for major pairs like GBP/USD, EUR/USD, and more.";
+                        addMessage(response, false);
+                        addActionButtons('exchange');
+                    } else if (responseType === 'stock') {
+                        response = "I can provide stock price forecasts for major companies. Our models analyze historical data to predict future price movements.";
+                        addMessage(response, false);
+                        addActionButtons('stock');
+                    } else if (responseType === 'weather') {
+                        response = "I can give you weather forecasts for cities around the world. Our models predict temperature, precipitation, and more for the next 7 days.";
+                        addMessage(response, false);
+                        addActionButtons('weather');
+                    } else if (message.includes('hello') || message.includes('hi') || message.includes('hey')) {
+                        response = "Hello! I'm your Forecast Assistant. I can help you with stock prices, exchange rates, or weather forecasts. What would you like to know about?";
+                        addMessage(response, false);
+                    } else if (message.includes('thank')) {
+                        response = "You're welcome! Let me know if you need any other forecasts.";
+                        addMessage(response, false);
+                    } else if (message.includes('help')) {
+                        response = "I can help you with three types of forecasts:<br>1. Stock price forecasts<br>2. Exchange rate forecasts<br>3. Weather forecasts<br><br>Just tell me what you're interested in!";
+                        addMessage(response, false);
+                    } else {
+                        response = "I'm not sure what type of forecast you're looking for. You can ask me about stock prices, exchange rates, or weather forecasts. Which one interests you?";
+                        addMessage(response, false);
+                    }
+                }, 1000); // 1 second delay for typing simulation
+            }
+
+            // Function to send a message
+            function sendMessage() {
+                const message = userInput.value.trim();
+                if (message.length === 0) return;
+
+                addMessage(message, true);
+                userInput.value = '';
+
+                processMessage(message);
+            }
+
+            // Event listeners
+            sendButton.addEventListener('click', sendMessage);
+
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // Event listeners for shortcut buttons
+            document.querySelectorAll('.shortcut-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const action = this.dataset.action;
+                    let message = '';
+
+                    if (action === 'exchange') {
+                        message = 'Show me the latest exchange rate forecast';
+                    } else if (action === 'stock') {
+                        message = 'I want to see stock price forecasts';
+                    } else if (action === 'weather') {
+                        message = 'What\'s the weather forecast?';
+                    }
+
+                    userInput.value = message;
+                    sendMessage();
+                });
+            });
+
+            // Event listeners for suggestion chips
+            document.querySelectorAll('.suggestion-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    userInput.value = this.dataset.suggestion;
+                    sendMessage();
+                });
+            });
+
+            // Initial greeting message
+            setTimeout(() => {
+                addMessage("Hi there! I'm your Forecast Assistant. I can help you with stock prices, exchange rates, or weather forecasts. What would you like to know today?", false);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

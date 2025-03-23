@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Forecast Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.3.0/luxon.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-luxon/1.3.1/chartjs-adapter-luxon.min.js"></script>
+    <!-- Add this CSS to the head section -->
+    <style>
+    .back-button {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        transition: background-color 0.3s, transform 0.3s;
+        z-index: 1000;
+    }
+
+    .back-button:hover {
+        background-color: #2980b9;
+        transform: scale(1.05);
+    }
+
+    .back-button svg {
+        width: 24px;
+        height: 24px;
+    }
+    </style>
+
+    <!-- Add this HTML right after the body tag -->
+    <button class="back-button" onclick="window.location.href='/'">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+    </button>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            padding: 20px;
+        }
+        .chart-container {
+            height: 400px;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .location-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #fceaea;
+            border-radius: 4px;
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3498db;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .tab-container {
+            margin-bottom: 20px;
+        }
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .tab-button.active {
+            border-bottom: 2px solid #3498db;
+            background-color: white;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .update-time {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-align: right;
+            margin-top: 5px;
+        }
+        .forecast-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .forecast-day {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .forecast-date {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+        .forecast-icon {
+            width: 64px;
+            height: 64px;
+            margin: 10px 0;
+        }
+        .forecast-temp {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .forecast-desc {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #555;
+            text-transform: capitalize;
+        }
+        .forecast-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 100%;
+            font-size: 0.9em;
+            color: #777;
+        }
+        .forecast-details div {
+            display: flex;
+            justify-content: space-between;
+        }
+        .forecast-details span:first-child {
+            font-weight: 500;
+        }
+        .uv-low {
+            color: #2ecc71;
+        }
+        .uv-moderate {
+            color: #f39c12;
+        }
+        .uv-high {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Weather Forecast Visualization</h1>
+        
+        <div class="card">
+            <div class="controls">
+                <div class="location-input">
+                    <label for="cityInput">City:</label>
+                    <input type="text" id="cityInput" placeholder="Beijing" value="Beijing">
+                    <label for="countryInput">Country:</label>
+                    <input type="text" id="countryInput" placeholder="CN" value="CN" maxlength="2">
+                    <button id="loadButton">Load Forecast</button>
+                </div>
+                <div class="update-time" id="updateTime"></div>
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading forecast data...</p>
+            </div>
+        </div>
+
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="forecastTab">Forecast</button>
+                <button class="tab-button" data-tab="temperatureTab">Temperature</button>
+                <button class="tab-button" data-tab="precipitationTab">Precipitation</button>
+                <button class="tab-button" data-tab="statsTab">Statistics</button>
+                <button class="tab-button" data-tab="tableTab">Data Table</button>
+            </div>
+            
+            <div id="forecastTab" class="tab-content active">
+                <div class="card">
+                    <h2>7-Day Weather Forecast</h2>
+                    <div class="forecast-cards" id="forecastCards">
+                        <!-- Forecast cards will be filled by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <div id="temperatureTab" class="tab-content">
+                <div class="card">
+                    <h2>Temperature Forecast</h2>
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="precipitationTab" class="tab-content">
+                <div class="card">
+                    <h2>Precipitation Chance & Amount</h2>
+                    <div class="chart-container">
+                        <canvas id="precipitationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="statsTab" class="tab-content">
+                <div class="card">
+                    <h2>Forecast Statistics</h2>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-label">Average Day Temp</div>
+                            <div class="stat-value" id="avgDayTemp">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Average Night Temp</div>
+                            <div class="stat-value" id="avgNightTemp">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Highest Temperature</div>
+                            <div class="stat-value" id="maxTemp">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Lowest Temperature</div>
+                            <div class="stat-value" id="minTemp">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Rain Days</div>
+                            <div class="stat-value" id="rainDays">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Precipitation</div>
+                            <div class="stat-value" id="totalPrecipitation">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tableTab" class="tab-content">
+                <div class="card">
+                    <h2>Detailed Forecast Data</h2>
+                    <div class="table-container">
+                        <table id="forecastTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Weather</th>
+                                    <th>Day Temp</th>
+                                    <th>Night Temp</th>
+                                    <th>Humidity</th>
+                                    <th>Wind</th>
+                                    <th>Precip. Chance</th>
+                                    <th>Precip. Amount</th>
+                                    <th>UV Index</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be filled by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let temperatureChart = null;
+        let precipitationChart = null;
+        let forecastData = null;
+        const API_ENDPOINT = "/api/weather-forecast";  // Backend API endpoint
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get city input and load button
+            const cityInput = document.getElementById('cityInput');
+            const countryInput = document.getElementById('countryInput');
+            const loadButton = document.getElementById('loadButton');
+            
+            // Bind load button
+            loadButton.addEventListener('click', () => {
+                const city = cityInput.value.trim();
+                const country = countryInput.value.trim().toUpperCase();
+                
+                if (city && country) {
+                    fetchWeatherData(city, country);
+                } else {
+                    showError('Please enter a valid city and country code');
+                }
+            });
+            
+            // Bind tab switching
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    // Remove all active classes
+                    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to clicked button and corresponding content
+                    button.classList.add('active');
+                    const tabId = button.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // Initial data load (default: Beijing, CN)
+            fetchWeatherData('Beijing', 'CN');
+        });
+        
+        // Show error message
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        // Hide error message
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+        
+        // Show loading spinner
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+        
+        // Hide loading spinner
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // Fetch weather data from backend
+        function fetchWeatherData(city, country) {
+            hideError();
+            showLoading();
+            
+            // Use API with city and country parameters
+            fetch(`${API_ENDPOINT}?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Check if data is valid
+                    if (!Array.isArray(data) || data.length === 0 || !isValidWeatherData(data[0])) {
+                        throw new Error('Invalid data format');
+                    }
+                    
+                    // Process the data
+                    processWeatherData(data, city, country);
+                    
+                    // Update last refresh time
+                    updateRefreshTime();
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    showError(`Error: ${error.message}`);
+                })
+                .finally(() => {
+                    hideLoading();
+                });
+        }
+        
+        // Update refresh time
+        function updateRefreshTime() {
+            const now = new Date();
+            const formattedTime = new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(now);
+            
+            document.getElementById('updateTime').textContent = `Last updated: ${formattedTime}`;
+        }
+        
+        // Check if weather data is valid
+        function isValidWeatherData(item) {
+            return item && 
+                   typeof item.date === 'string' && 
+                   typeof item.day_temp === 'number' && 
+                   typeof item.night_temp === 'number' && 
+                   typeof item.humidity === 'number' &&
+                   typeof item.wind_speed === 'number' &&
+                   typeof item.weather_main === 'string';
+        }
+        
+        // Process weather data
+        function processWeatherData(data, city, country) {
+            forecastData = data;
+            
+            // Update forecast cards
+            updateForecastCards(data, city);
+            
+            // Update charts
+            createTemperatureChart(data, city);
+            createPrecipitationChart(data, city);
+            
+            // Update statistics
+            updateStats(data);
+            
+            // Update table
+            updateTable(data);
+        }
+        
+        // Update forecast cards
+        function updateForecastCards(data, city) {
+            const cardsContainer = document.getElementById('forecastCards');
+            cardsContainer.innerHTML = '';
+            
+            data.forEach(day => {
+                // Format date
+                const date = new Date(day.date);
+                const formattedDate = new Intl.DateTimeFormat('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                }).format(date);
+                
+                // Weather icon - using OpenWeatherMap icons
+                const iconUrl = `https://openweathermap.org/img/wn/${day.weather_icon}@2x.png`;
+                
+                // UV index class
+                let uvClass = 'uv-low';
+                if (day.uv_index >= 6 && day.uv_index <= 7) {
+                    uvClass = 'uv-moderate';
+                } else if (day.uv_index >= 8) {
+                    uvClass = 'uv-high';
+                }
+                
+                // Create card
+                const card = document.createElement('div');
+                card.className = 'forecast-day';
+                card.innerHTML = `
+                    <div class="forecast-date">${formattedDate}</div>
+                    <img src="${iconUrl}" alt="${day.weather_description}" class="forecast-icon">
+                    <div class="forecast-temp">${day.day_temp}°C / ${day.night_temp}°C</div>
+                    <div class="forecast-desc">${day.weather_description}</div>
+                    <div class="forecast-details">
+                        <div><span>Humidity:</span> <span>${day.humidity}%</span></div>
+                        <div><span>Wind:</span> <span>${day.wind_speed} m/s</span></div>
+                        <div><span>Precip:</span> <span>${day.precipitation_chance}%</span></div>
+                        <div><span>UV:</span> <span class="${uvClass}">${day.uv_index}</span></div>
+                    </div>
+                `;
+                
+                cardsContainer.appendChild(card);
+            });
+        }
+        
+        // Create temperature chart
+        function createTemperatureChart(data, city) {
+            const ctx = document.getElementById('temperatureChart').getContext('2d');
+            
+            // Destroy old chart if exists
+            if (temperatureChart) {
+                temperatureChart.destroy();
+            }
+            
+            const dates = data.map(item => item.date);
+            const dayTemps = data.map(item => item.day_temp);
+            const nightTemps = data.map(item => item.night_temp);
+            
+            temperatureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Day Temperature',
+                            data: dayTemps,
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.2,
+                            fill: true,
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#e74c3c'
+                        },
+                        {
+                            label: 'Night Temperature',
+                            data: nightTemps,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.2,
+                            fill: true,
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#3498db'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${city} Temperature Forecast`,
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y + '°C';
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '°C';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Create precipitation chart
+        function createPrecipitationChart(data, city) {
+            const ctx = document.getElementById('precipitationChart').getContext('2d');
+            
+            // Destroy old chart if exists
+            if (precipitationChart) {
+                precipitationChart.destroy();
+            }
+            
+            const dates = data.map(item => item.date);
+            const precipChance = data.map(item => item.precipitation_chance);
+            const precipAmount = data.map(item => item.precipitation_amount);
+            
+            precipitationChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Precipitation Amount (mm)',
+                            data: precipAmount,
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Precipitation Chance (%)',
+                            data: precipChance,
+                            type: 'line',
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#e74c3c',
+                            yAxisID: 'y1',
+                            fill: false,
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${city} Precipitation Forecast`,
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Precipitation (mm)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' mm';
+                                }
+                            },
+                            beginAtZero: true
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Chance (%)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            min: 0,
+                            max: 100,
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update statistics
+        function updateStats(data) {
+            // Calculate average temperatures
+            const avgDayTemp = data.reduce((sum, item) => sum + item.day_temp, 0) / data.length;
+            const avgNightTemp = data.reduce((sum, item) => sum + item.night_temp, 0) / data.length;
+            
+            // Find max and min temperatures
+            const maxTemp = Math.max(...data.map(item => item.day_temp));
+            const minTemp = Math.min(...data.map(item => item.night_temp));
+            
+            // Count rain days and calculate total precipitation
+            const rainDays = data.filter(item => 
+                item.weather_main === 'Rain' || 
+                item.precipitation_amount > 0.5
+            ).length;
+            
+            const totalPrecipitation = data.reduce((sum, item) => sum + item.precipitation_amount, 0);
+            
+            // Update statistic cards
+            document.getElementById('avgDayTemp').textContent = `${avgDayTemp.toFixed(1)}°C`;
+            document.getElementById('avgNightTemp').textContent = `${avgNightTemp.toFixed(1)}°C`;
+            document.getElementById('maxTemp').textContent = `${maxTemp.toFixed(1)}°C`;
+            document.getElementById('minTemp').textContent = `${minTemp.toFixed(1)}°C`;
+            document.getElementById('rainDays').textContent = rainDays;
+            document.getElementById('totalPrecipitation').textContent = `${totalPrecipitation.toFixed(1)} mm`;
+        }
+        
+        // Update table
+        function updateTable(data) {
+            const tableBody = document.querySelector('#forecastTable tbody');
+            tableBody.innerHTML = '';
+            
+            data.forEach(day => {
+                // Format date
+                const date = new Date(day.date);
+                const formattedDate = new Intl.DateTimeFormat('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                }).format(date);
+                
+                // UV index class
+                let uvClass = 'uv-low';
+                if (day.uv_index >= 6 && day.uv_index <= 7) {
+                    uvClass = 'uv-moderate';
+                } else if (day.uv_index >= 8) {
+                    uvClass = 'uv-high';
+                }
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formattedDate}</td>
+                    <td>${day.weather_main}</td>
+                    <td>${day.day_temp.toFixed(1)}°C</td>
+                    <td>${day.night_temp.toFixed(1)}°C</td>
+                    <td>${day.humidity}%</td>
+                    <td>${day.wind_speed.toFixed(1)} m/s</td>
+                    <td>${day.precipitation_chance}%</td>
+                    <td>${day.precipitation_amount.toFixed(1)} mm</td>
+                    <td class="${uvClass}">${day.uv_index}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -3,10 +3,10 @@ import torch
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import (StandardScaler)
 from model.iTransformer import Model  # 确保 iTransformer 代码路径正确
 
-# **🚨 强制使用 CPU 运行**
+# **🚨 强制使用 CPU 运行**pi
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # **🔹 配置文件路径**

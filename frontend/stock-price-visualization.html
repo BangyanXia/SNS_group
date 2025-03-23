@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Price Forecast Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.3.0/luxon.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-luxon/1.3.1/chartjs-adapter-luxon.min.js"></script>
+    <!-- Add this CSS to the head section -->
+    <style>
+    .back-button {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        transition: background-color 0.3s, transform 0.3s;
+        z-index: 1000;
+    }
+
+    .back-button:hover {
+        background-color: #2980b9;
+        transform: scale(1.05);
+    }
+
+    .back-button svg {
+        width: 24px;
+        height: 24px;
+    }
+    </style>
+
+    <!-- Add this HTML right after the body tag -->
+    <button class="back-button" onclick="window.location.href='/'">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+    </button>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            padding: 20px;
+        }
+        .chart-container {
+            height: 400px;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .ticker-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .arrow-up {
+            color: #27ae60;
+        }
+        .arrow-down {
+            color: #e74c3c;
+        }
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #fceaea;
+            border-radius: 4px;
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3498db;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .tab-container {
+            margin-bottom: 20px;
+        }
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .tab-button.active {
+            border-bottom: 2px solid #3498db;
+            background-color: white;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .update-time {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-align: right;
+            margin-top: 5px;
+        }
+        .price-change {
+            font-weight: bold;
+        }
+        .volume-bar {
+            height: 100px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stock Price Forecast Visualization</h1>
+        
+        <div class="card">
+            <div class="controls">
+                <div class="ticker-input">
+                    <label for="tickerInput">Ticker Symbol:</label>
+                    <input type="text" id="tickerInput" placeholder=" " maxlength="5">
+                    <button id="loadButton">Load Stock</button>
+                </div>
+                <div class="update-time" id="updateTime"></div>
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading forecast data...</p>
+            </div>
+        </div>
+
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="lineChart">Price Chart</button>
+                <button class="tab-button" data-tab="candleChart">Candlestick Chart</button>
+                <button class="tab-button" data-tab="volumeChart">Volume Chart</button>
+                <button class="tab-button" data-tab="statsTab">Statistics</button>
+                <button class="tab-button" data-tab="tableTab">Data Table</button>
+            </div>
+            
+            <div id="lineChart" class="tab-content active">
+                <div class="card">
+                    <h2>Stock Price Forecast</h2>
+                    <div class="chart-container">
+                        <canvas id="stockPriceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="candleChart" class="tab-content">
+                <div class="card">
+                    <h2>Stock Price Candlestick Chart</h2>
+                    <div class="chart-container">
+                        <canvas id="candlestickChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="volumeChart" class="tab-content">
+                <div class="card">
+                    <h2>Trading Volume Forecast</h2>
+                    <div class="chart-container">
+                        <canvas id="volumeBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="statsTab" class="tab-content">
+                <div class="card">
+                    <h2>Forecast Statistics</h2>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-label">Average Close</div>
+                            <div class="stat-value" id="avgClose">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Highest Price</div>
+                            <div class="stat-value" id="maxHigh">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Lowest Price</div>
+                            <div class="stat-value" id="minLow">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Forecast Change</div>
+                            <div class="stat-value" id="forecastChange">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Average Volume</div>
+                            <div class="stat-value" id="avgVolume">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tableTab" class="tab-content">
+                <div class="card">
+                    <h2>Detailed Forecast Data</h2>
+                    <div class="table-container">
+                        <table id="predictionTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Open</th>
+                                    <th>High</th>
+                                    <th>Low</th>
+                                    <th>Close</th>
+                                    <th>Volume</th>
+                                    <th>Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be filled by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let lineChart = null;
+        let candlestickChart = null;
+        let volumeChart = null;
+        let predictionData = null;
+        const API_ENDPOINT = "/api/stock-forecast";  // Backend API endpoint
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get ticker input and load button
+            const tickerInput = document.getElementById('tickerInput');
+            const loadButton = document.getElementById('loadButton');
+            
+            // Set default ticker
+            tickerInput.value = ' ';
+            
+            // Bind load button
+            // loadButton.addEventListener('click', () => {
+            //     const ticker = tickerInput.value.trim().toUpperCase();
+            //     if (ticker) {
+            //         fetchStockData(ticker);
+            //     } else {
+            //         showError('Please enter a valid ticker symbol');
+            //     }
+            // });
+            
+            // Bind tab switching
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    // Remove all active classes
+                    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to clicked button and corresponding content
+                    button.classList.add('active');
+                    const tabId = button.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // Initial data load (default: AAPL)
+            fetchStockData(' ');
+        });
+        
+        // Show error message
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        // Hide error message
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+        
+        // Show loading spinner
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+        
+        // Hide loading spinner
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // Fetch stock data from backend
+        function fetchStockData(ticker) {
+            hideError();
+            showLoading();
+            
+            // Use API with ticker parameter
+            fetch(`${API_ENDPOINT}?ticker=${ticker}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Check if data is valid
+                    if (!Array.isArray(data) || data.length === 0 || !isValidStockData(data[0])) {
+                        throw new Error('Invalid data format');
+                    }
+                    
+                    // Process the data
+                    processStockData(data, ticker);
+                    
+                    // Update last refresh time
+                    updateRefreshTime();
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    showError(`Error: ${error.message}`);
+                    
+                    // Load sample data as fallback
+                    loadSampleData(ticker);
+                })
+                .finally(() => {
+                    hideLoading();
+                });
+        }
+        
+        // Update refresh time
+        function updateRefreshTime() {
+            const now = new Date();
+            const formattedTime = new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(now);
+            
+            document.getElementById('updateTime').textContent = `Last updated: ${formattedTime}`;
+        }
+        
+        // Load sample data
+        function loadSampleData(ticker) {
+            // Generate sample stock data
+            const today = new Date();
+            const basePrice = ticker === ' ' ? 190 : 100;
+            const sampleData = [];
+            
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i + 1);
+                
+                // Skip weekends
+                if (date.getDay() === 0 || date.getDay() === 6) {
+                    continue;
+                }
+                
+                // Random price movement
+                const priceChange = (Math.random() - 0.45) * 5;
+                const open = basePrice + (i * 2) + (Math.random() - 0.5) * 3;
+                const close = open + priceChange;
+                const high = Math.max(open, close) + Math.random() * 2;
+                const low = Math.min(open, close) - Math.random() * 2;
+                
+                sampleData.push({
+                    date: date.toISOString().split('T')[0],
+                    open: parseFloat(open.toFixed(2)),
+                    high: parseFloat(high.toFixed(2)),
+                    low: parseFloat(low.toFixed(2)),
+                    close: parseFloat(close.toFixed(2)),
+                    volume: Math.floor(Math.random() * 10000000 + 5000000)
+                });
+            }
+            
+            processStockData(sampleData, ticker);
+            document.getElementById('updateTime').textContent = `Sample data (API unavailable)`;
+        }
+        
+        // Check if stock data is valid
+        function isValidStockData(item) {
+            return item && 
+                   typeof item.date === 'string' && 
+                   typeof item.open === 'number' && 
+                   typeof item.high === 'number' && 
+                   typeof item.low === 'number' && 
+                   typeof item.close === 'number' &&
+                   typeof item.volume === 'number';
+        }
+        
+        // Process stock data
+        function processStockData(data, ticker) {
+            predictionData = data;
+            
+            // Update charts
+            createLineChart(data, ticker);
+            createCandlestickChart(data, ticker);
+            createVolumeChart(data, ticker);
+            
+            // Update statistics
+            updateStats(data, ticker);
+            
+            // Update table
+            updateTable(data);
+        }
+        
+        // Format currency
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(value);
+        }
+        
+        // Format large numbers with commas
+        function formatNumber(value) {
+            return new Intl.NumberFormat('en-US').format(value);
+        }
+        
+        // Create line chart
+        function createLineChart(data, ticker) {
+            const ctx = document.getElementById('stockPriceChart').getContext('2d');
+            
+            // Destroy old chart if exists
+            if (lineChart) {
+                lineChart.destroy();
+            }
+            
+            const dates = data.map(item => item.date);
+            const closePrices = data.map(item => item.close);
+            const openPrices = data.map(item => item.open);
+            const highPrices = data.map(item => item.high);
+            const lowPrices = data.map(item => item.low);
+            
+            lineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Close',
+                            data: closePrices,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.2,
+                            fill: true,
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#3498db'
+                        },
+                        {
+                            label: 'Open',
+                            data: openPrices,
+                            borderColor: '#2ecc71',
+                            borderWidth: 2,
+                            tension: 0.2,
+                            fill: false,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#2ecc71'
+                        },
+                        {
+                            label: 'High',
+                            data: highPrices,
+                            borderColor: '#e74c3c',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            fill: false,
+                            pointRadius: 2,
+                            pointBackgroundColor: '#e74c3c'
+                        },
+                        {
+                            label: 'Low',
+                            data: lowPrices,
+                            borderColor: '#f39c12',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            fill: false,
+                            pointRadius: 2,
+                            pointBackgroundColor: '#f39c12'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${ticker} Stock Price Forecast`,
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatCurrency(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Price ($)'
+                            },
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Create candlestick chart
+        function createCandlestickChart(data, ticker) {
+            const ctx = document.getElementById('candlestickChart').getContext('2d');
+            
+            // Destroy old chart if exists
+            if (candlestickChart) {
+                candlestickChart.destroy();
+            }
+            
+            const dates = data.map(item => item.date);
+
+            // Candlestick data
+            const ohlc = data.map(item => ({
+                x: item.date,
+                o: item.open,
+                h: item.high,
+                l: item.low,
+                c: item.close
+            }));
+
+            // Custom candlestick drawing
+            candlestickChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Candlestick',
+                        data: ohlc.map((item) => {
+                            // Calculate candlestick body height (close - open)
+                            return item.c - item.o;
+                        }),
+                        backgroundColor: ohlc.map(item =>
+                            item.c >= item.o ? 'rgba(46, 204, 113, 0.6)' : 'rgba(231, 76, 60, 0.6)'
+                        ),
+                        borderColor: ohlc.map(item =>
+                            item.c >= item.o ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'
+                        ),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${ticker} Candlestick Chart`,
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const item = ohlc[index];
+                                    return [
+                                        `Open: ${formatCurrency(item.o)}`,
+                                        `High: ${formatCurrency(item.h)}`,
+                                        `Low: ${formatCurrency(item.l)}`,
+                                        `Close: ${formatCurrency(item.c)}`
+                                    ];
+                                }
+                            }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Price ($)'
+                            },
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Add wicks (high and low prices)
+            setTimeout(() => {
+                ohlc.forEach((item, index) => {
+                    const meta = candlestickChart.getDatasetMeta(0);
+                    if (meta && meta.data && meta.data[index]) {
+                        const bar = meta.data[index];
+
+                        // Display wicks (high and low points)
+                        const centerX = bar.x;
+                        const highPoint = candlestickChart.scales.y.getPixelForValue(item.h);
+                        const lowPoint = candlestickChart.scales.y.getPixelForValue(item.l);
+                        const openPoint = candlestickChart.scales.y.getPixelForValue(item.o);
+                        const closePoint = candlestickChart.scales.y.getPixelForValue(item.c);
+
+                        // Upper wick
+                        const topWickStart = Math.min(openPoint, closePoint);
+                        if (highPoint < topWickStart) {
+                            ctx.beginPath();
+                            ctx.moveTo(centerX, topWickStart);
+                            ctx.lineTo(centerX, highPoint);
+                            ctx.strokeStyle = item.c >= item.o ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)';
+                            ctx.stroke();
+                        }
+
+                        // Lower wick
+                        const bottomWickEnd = Math.max(openPoint, closePoint);
+                        if (lowPoint > bottomWickEnd) {
+                            ctx.beginPath();
+                            ctx.moveTo(centerX, bottomWickEnd);
+                            ctx.lineTo(centerX, lowPoint);
+                            ctx.strokeStyle = item.c >= item.o ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)';
+                            ctx.stroke();
+                        }
+                    }
+                });
+            }, 100); // Small delay to ensure chart rendering is complete
+        }
+
+        // Create volume chart
+        function createVolumeChart(data, ticker) {
+            const ctx = document.getElementById('volumeBarChart').getContext('2d');
+
+            // Destroy old chart if exists
+            if (volumeChart) {
+                volumeChart.destroy();
+            }
+
+            const dates = data.map(item => item.date);
+            const volumes = data.map(item => item.volume);
+            const closePrices = data.map(item => item.close);
+
+            // Determine colors based on price changes
+            const colors = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i === 0) {
+                    colors.push('rgba(52, 152, 219, 0.7)'); // Default blue for first bar
+                } else {
+                    colors.push(data[i].close >= data[i-1].close
+                        ? 'rgba(46, 204, 113, 0.7)'  // Green for up days
+                        : 'rgba(231, 76, 60, 0.7)'); // Red for down days
+                }
+            }
+
+            volumeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Volume',
+                        data: volumes,
+                        backgroundColor: colors,
+                        borderColor: colors.map(color => color.replace('0.7', '1')),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${ticker} Trading Volume`,
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatNumber(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Volume'
+                            },
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    if (value >= 1000000) {
+                                        return (value / 1000000).toFixed(1) + 'M';
+                                    } else if (value >= 1000) {
+                                        return (value / 1000).toFixed(1) + 'K';
+                                    }
+                                    return value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update statistics
+        function updateStats(data, ticker) {
+            // Calculate average close price
+            const avgClose = data.reduce((sum, item) => sum + item.close, 0) / data.length;
+
+            // Find maximum high price
+            const maxHigh = Math.max(...data.map(item => item.high));
+
+            // Find minimum low price
+            const minLow = Math.min(...data.map(item => item.low));
+
+            // Calculate forecast change (last day vs first day close price)
+            const firstClose = data[0].close;
+            const lastClose = data[data.length - 1].close;
+            const changeRate = ((lastClose - firstClose) / firstClose) * 100;
+
+            // Calculate average volume
+            const avgVolume = data.reduce((sum, item) => sum + item.volume, 0) / data.length;
+
+            // Update statistic cards
+            document.getElementById('avgClose').textContent = formatCurrency(avgClose);
+            document.getElementById('maxHigh').textContent = formatCurrency(maxHigh);
+            document.getElementById('minLow').textContent = formatCurrency(minLow);
+            document.getElementById('avgVolume').textContent = formatNumber(Math.round(avgVolume));
+
+            const changeRateElement = document.getElementById('forecastChange');
+            changeRateElement.textContent = `${changeRate >= 0 ? '+' : ''}${changeRate.toFixed(2)}%`;
+            changeRateElement.classList.remove('arrow-up', 'arrow-down');
+            changeRateElement.classList.add(changeRate >= 0 ? 'arrow-up' : 'arrow-down');
+        }
+
+        // Update table
+        function updateTable(data) {
+            const tableBody = document.querySelector('#predictionTable tbody');
+            tableBody.innerHTML = '';
+
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+
+                // Calculate daily change
+                let change = '';
+                let changeClass = '';
+
+                if (index > 0) {
+                    const prevClose = data[index - 1].close;
+                    const changePercentage = ((item.close - prevClose) / prevClose) * 100;
+                    change = `${changePercentage >= 0 ? '+' : ''}${changePercentage.toFixed(2)}%`;
+                    changeClass = changePercentage >= 0 ? 'arrow-up' : 'arrow-down';
+                } else {
+                    change = '-';
+                }
+
+                row.innerHTML = `
+                    <td>${item.date}</td>
+                    <td>${formatCurrency(item.open)}</td>
+                    <td>${formatCurrency(item.high)}</td>
+                    <td>${formatCurrency(item.low)}</td>
+                    <td>${formatCurrency(item.close)}</td>
+                    <td>${formatNumber(item.volume)}</td>
+                    <td class="${changeClass}">${change}</td>
+                `;
+
+                tableBody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>
