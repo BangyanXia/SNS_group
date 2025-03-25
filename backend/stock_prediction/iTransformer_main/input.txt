@@ -1,7 +1,0 @@
-python run.py --is_training 1 --model_id stock --model iTransformer --data custom --root_path C:\Users\12097\Desktop\研究生\ELEC0088\iTransformer-main\ --data_path normalized_stock_fed_rate.csv --seq_len 365 --pred_len 96 --enc_in 6 --dec_in 6 --c_out 4 --train_epochs 50 --batch_size 32 --learning_rate 0.0001 --target Open --target Close --target High --target Low
-
-
-
-
-
-python run.py --is_training 0 --model_id stock --model iTransformer --data custom --root_path C:\Users\12097\Desktop\研究生\ELEC0088\iTransformer-main\ --data_path cleaned_stock_fed_rate.csv --seq_len 96 --pred_len 96 --enc_in 6 --dec_in 6 --c_out 6 --do_predict --target Open
