@@ -15,10 +15,10 @@ x = torch.randn(10000, 10000)
 
 start = time.time()
 y_cpu = x.matmul(x)
-print(f"CPU 计算时间: {time.time() - start:.4f} 秒")
+print(f"CPU time: {time.time() - start:.4f} seconds")
 
 
 x = x.to(device)
 start = time.time()
 y_gpu = x.matmul(x)
-print(f"GPU 计算时间: {time.time() - start:.4f} 秒")
+print(f"GPU time: {time.time() - start:.4f} seconds")
