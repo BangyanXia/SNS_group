@@ -1,0 +1,65 @@
+[
+    {
+        "date": "2025-03-22",
+        "open": "Market Closed (Weekend)",
+        "high": "Market Closed (Weekend)",
+        "low": "Market Closed (Weekend)",
+        "close": "Market Closed (Weekend)",
+        "volume": 0,
+        "note": "Weekend - Market Closed"
+    },
+    {
+        "date": "2025-03-23",
+        "open": "Market Closed (Weekend)",
+        "high": "Market Closed (Weekend)",
+        "low": "Market Closed (Weekend)",
+        "close": "Market Closed (Weekend)",
+        "volume": 0,
+        "note": "Weekend - Market Closed"
+    },
+    {
+        "date": "2025-03-24",
+        "open": 206.16,
+        "high": 208.12,
+        "low": 204.5,
+        "close": 206.99,
+        "volume": 56482052,
+        "note": "Prediction from iTransformer model"
+    },
+    {
+        "date": "2025-03-25",
+        "open": 209.93,
+        "high": 212.02,
+        "low": 207.64,
+        "close": 210.18,
+        "volume": 74031672,
+        "note": "Prediction from iTransformer model"
+    },
+    {
+        "date": "2025-03-26",
+        "open": 228.32,
+        "high": 230.52,
+        "low": 225.58,
+        "close": 228.59,
+        "volume": 69647576,
+        "note": "Prediction from iTransformer model"
+    },
+    {
+        "date": "2025-03-27",
+        "open": 229.45,
+        "high": 231.8,
+        "low": 227.04,
+        "close": 229.97,
+        "volume": 74452008,
+        "note": "Prediction from iTransformer model"
+    },
+    {
+        "date": "2025-03-28",
+        "open": 222.74,
+        "high": 224.92,
+        "low": 220.55,
+        "close": 223.06,
+        "volume": 56028396,
+        "note": "Prediction from iTransformer model"
+    }
+]

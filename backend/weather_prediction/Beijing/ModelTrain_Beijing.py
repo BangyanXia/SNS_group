@@ -9,9 +9,9 @@ from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
-import os  # 新增，用于检查模型文件
+import os,sys  # 新增，用于检查模型文件
 import joblib
-
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # 读取数据
 train_df = pd.read_csv('Beijing_Weather_Train.csv')
 test_df = pd.read_csv('Beijing_Weather_Test.csv')

@@ -1,0 +1,60 @@
+[
+    {
+        "date": "2025-03-22",
+        "open": 211.56,
+        "high": 218.84,
+        "low": 211.28,
+        "close": 218.27,
+        "volume": 0,
+        "note": "Weekend - Using last available Friday's actual data, with zero volume"
+    },
+    {
+        "date": "2025-03-23",
+        "open": 211.56,
+        "high": 218.84,
+        "low": 211.28,
+        "close": 218.27,
+        "volume": 0,
+        "note": "Weekend - Using last available Friday's actual data, with zero volume"
+    },
+    {
+        "date": "2025-03-24",
+        "open": 228.57,
+        "high": 229.84,
+        "low": 225.2,
+        "close": 225.54,
+        "volume": 52175106
+    },
+    {
+        "date": "2025-03-25",
+        "open": 229.21,
+        "high": 229.23,
+        "low": 225.28,
+        "close": 228.14,
+        "volume": 52175106
+    },
+    {
+        "date": "2025-03-26",
+        "open": 227.31,
+        "high": 230.63,
+        "low": 226.59,
+        "close": 228.51,
+        "volume": 52175106
+    },
+    {
+        "date": "2025-03-27",
+        "open": 224.08,
+        "high": 225.86,
+        "low": 221.04,
+        "close": 224.79,
+        "volume": 52175106
+    },
+    {
+        "date": "2025-03-28",
+        "open": 221.54,
+        "high": 222.24,
+        "low": 219.8,
+        "close": 221.11,
+        "volume": 52175106
+    }
+]

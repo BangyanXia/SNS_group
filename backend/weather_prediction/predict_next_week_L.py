@@ -6,14 +6,14 @@ import joblib
 
 
 # 1️⃣ 加载训练好的模型
-model_path = "weather_lstm_model_L.pth"
+model_path = "London/weather_lstm_model_L.pth"
 model = LSTMModel(target_size=4)
 model.load_state_dict(torch.load(model_path)['model_state_dict'])
 model.eval()
 print("✅ 已加载训练好的模型")
 
 # 2️⃣ 加载 X_test
-X_test = torch.load("X_test_tensor_L.pth")
+X_test = torch.load("London/X_test_tensor_L.pth")
 print("✅ 成功加载 X_test，形状:", X_test.shape)
 
 # 3️⃣ 预测未来 7 天
@@ -46,7 +46,7 @@ print("🔍 反归一化前（模型输出的归一化值）:")
 print(future_preds)  # 确保 shape = (7, 4)
 
 # ✅ 反归一化
-scaler_y = joblib.load("scaler_y_L.pkl")
+scaler_y = joblib.load("London/scaler_y_L.pkl")
 
 future_preds = scaler_y.inverse_transform(future_preds)
 print("✅ 反归一化完成")

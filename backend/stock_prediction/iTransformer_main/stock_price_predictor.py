@@ -6,13 +6,19 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+from sklearn.preprocessing import StandardScaler
+from argparse import Namespace
+
+# Import the iTransformer model
+from model.iTransformer import Model
 
 
 class StockPricePredictor:
     def __init__(self,
                  ticker="AAPL",
                  prediction_days=7,
-                 api_key="S4J5OANDXEY87T9B"):
+                 api_key="S4J5OANDXEY87T9B",
+                 checkpoint_path="./checkpoints/stock_iTransformer_custom_M_ft365_sl48_ll7_pl512_dm8_nh2_el1_dl2048_df1_fctimeF_ebTrue_dttest_projection_0/checkpoint.pth"):
         """
         Initialize the Stock Price Predictor with the specified ticker symbol.
 
@@ -24,24 +30,27 @@ class StockPricePredictor:
             Number of days to predict into the future
         api_key : str, default="S4J5OANDXEY87T9B"
             Alpha Vantage API key for fetching stock data
+        checkpoint_path : str
+            Path to the trained iTransformer model checkpoint
         """
         self.ticker = ticker
         self.prediction_days = prediction_days
         self.api_key = api_key
         self.data_folder = "./data/stock"
         self.model_id = f"{ticker}_forecast"
+        self.checkpoint_path = checkpoint_path
 
-        # Create data directory if it doesn't exist
-        if not os.path.exists(self.data_folder):
-            os.makedirs(self.data_folder, exist_ok=True)
+        # Force CPU usage
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        self.device = torch.device("cpu")
 
-        # Create checkpoints directory if it doesn't exist
-        if not os.path.exists("./checkpoints"):
-            os.makedirs("./checkpoints", exist_ok=True)
+        # Model config
+        self.seq_len = 365  # Must match training sequence length
 
-        # Create results directory if it doesn't exist
-        if not os.path.exists("./results"):
-            os.makedirs("./results", exist_ok=True)
+        # Create required directories
+        for directory in ["./data/stock", "./checkpoints", "./results"]:
+            if not os.path.exists(directory):
+                os.makedirs(directory, exist_ok=True)
 
     def fetch_stock_data(self):
         """Fetch stock price data from Alpha Vantage API"""
@@ -89,12 +98,163 @@ class StockPricePredictor:
 
         return file_path, stock_data
 
+    def get_fed_rate_data(self):
+        """
+        Get Federal Funds Rate data or generate placeholder if not available
+        """
+        try:
+            # Try to fetch Federal Funds Rate data (DFF)
+            # In a real scenario, you would fetch this from FRED or another source
+            print("Attempting to fetch Federal Funds Rate data...")
+
+            # For this example, we'll just generate a placeholder
+            # In a real application, you would fetch this from a reliable source
+            dummy_fed_rate = 5.25  # Current approximate Fed Funds rate as of 2023
+            return dummy_fed_rate
+
+        except Exception as e:
+            print(f"Error fetching Fed Rate data: {e}")
+            print("Using a default placeholder value for Fed Rate")
+            return 5.0  # Default placeholder
+
+    def prepare_model_input(self, stock_data):
+        """
+        Prepare the input data for the iTransformer model
+        """
+        # Add Federal Funds Rate column if it doesn't exist
+        if 'DFF' not in stock_data.columns:
+            fed_rate = self.get_fed_rate_data()
+            stock_data['DFF'] = fed_rate
+
+        # Ensure we have enough historical data
+        if len(stock_data) < self.seq_len:
+            raise ValueError(
+                f"Not enough historical data. Need at least {self.seq_len} days, but got {len(stock_data)}")
+
+        # Select the latest data points
+        latest_data = stock_data.iloc[-self.seq_len:][['Open', 'Close', 'High', 'Low', 'Volume', 'DFF']].values
+
+        # Scale the data
+        scaler = StandardScaler()
+        scaler.fit(latest_data)
+        latest_data_scaled = scaler.transform(latest_data)
+
+        # Convert to tensor
+        latest_data_tensor = torch.tensor(latest_data_scaled, dtype=torch.float32).unsqueeze(0).to(self.device)
+
+        # Generate time features for encoder
+        dates = stock_data.index[-self.seq_len:]
+        x_mark_enc = self.generate_time_features(dates)
+        x_mark_enc_tensor = torch.tensor(x_mark_enc, dtype=torch.float32).unsqueeze(0).to(self.device)
+
+        # Generate time features for decoder (future dates)
+        last_date = stock_data.index[-1]
+        future_dates = [last_date + timedelta(days=i + 1) for i in range(self.prediction_days)]
+        x_mark_dec = self.generate_time_features(future_dates)
+        x_mark_dec_tensor = torch.tensor(x_mark_dec, dtype=torch.float32).unsqueeze(0).to(self.device)
+
+        return latest_data_tensor, x_mark_enc_tensor, x_mark_dec_tensor, scaler, future_dates
+
+    def generate_time_features(self, dates):
+        """Generate time features: month, day, weekday"""
+        return np.array([[d.month, d.day, d.weekday()] for d in dates], dtype=np.float32)
+
+    def load_model(self):
+        """
+        Load the pre-trained iTransformer model
+        """
+        # Define model configurations
+        model_configs = Namespace(
+            enc_in=6, dec_in=6, c_out=6, seq_len=self.seq_len, pred_len=self.prediction_days, label_len=48,
+            d_model=512, n_heads=8, e_layers=2, d_layers=1, d_ff=2048, dropout=0.1, factor=1,
+            activation='gelu', output_attention=False, use_norm=True, embed='timeF',
+            freq='h', class_strategy='projection'
+        )
+
+        # Initialize the model
+        model = Model(model_configs).to(self.device)
+
+        # Load the trained weights
+        try:
+            model.load_state_dict(torch.load(self.checkpoint_path, map_location=self.device))
+            model.eval()
+            print(f"Successfully loaded model from {self.checkpoint_path}")
+            return model
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            print("Falling back to simple prediction method")
+            return None
+
     def predict(self):
-        """Generate stock price predictions based on historical data"""
+        """Generate stock price predictions using the iTransformer model"""
 
         # Fetch historical data
         file_path, stock_data = self.fetch_stock_data()
 
+        try:
+            # Try to use the iTransformer model
+            model = self.load_model()
+
+            if model is not None:
+                # Prepare input data
+                latest_data, x_mark_enc, x_mark_dec, scaler, future_dates = self.prepare_model_input(stock_data)
+
+                # Make predictions
+                with torch.no_grad():
+                    x_dec = torch.zeros((1, self.prediction_days, 6)).to(self.device)  # Empty decoder input
+                    predicted_seq = model(latest_data, x_mark_enc, x_dec, x_mark_dec)
+
+                # Convert predictions back to original scale
+                predictions = predicted_seq.cpu().numpy().squeeze()
+                predictions_original = scaler.inverse_transform(predictions)
+
+                # Create prediction results
+                result = []
+                for i in range(self.prediction_days):
+                    pred_date = future_dates[i]
+
+                    # Check if it's weekend
+                    is_weekend = pred_date.weekday() >= 5  # 5=Saturday, 6=Sunday
+
+                    if is_weekend:
+                        # For weekends, indicate market closed
+                        prediction = {
+                            "date": pred_date.strftime("%Y-%m-%d"),
+                            "open": "Market Closed (Weekend)",
+                            "high": "Market Closed (Weekend)",
+                            "low": "Market Closed (Weekend)",
+                            "close": "Market Closed (Weekend)",
+                            "volume": 0,
+                            "note": "Weekend - Market Closed"
+                        }
+                    else:
+                        # For weekdays, use model predictions
+                        prediction = {
+                            "date": pred_date.strftime("%Y-%m-%d"),
+                            "open": round(float(predictions_original[i, 0]), 2),
+                            "high": round(float(predictions_original[i, 2]), 2),
+                            "low": round(float(predictions_original[i, 3]), 2),
+                            "close": round(float(predictions_original[i, 1]), 2),
+                            "volume": int(predictions_original[i, 4]),
+                            "note": "Prediction from iTransformer model"
+                        }
+
+                    result.append(prediction)
+
+                return result
+            else:
+                # Fall back to the simple prediction method if model loading fails
+                return self.predict_simple(stock_data)
+
+        except Exception as e:
+            print(f"Error using iTransformer model: {e}")
+            print("Falling back to simple prediction method")
+            return self.predict_simple(stock_data)
+
+    def predict_simple(self, stock_data):
+        """
+        Fallback simple prediction method (original implementation)
+        """
         # Get the latest data for prediction
         latest_data = stock_data.iloc[-60:].copy()  # Use last 60 days of data
 
@@ -201,9 +361,9 @@ class StockPricePredictor:
                 predicted_close = predicted_close * (1 + daily_return)
                 predicted_open = predicted_close * (1 + np.random.normal(0, base_volatility * 0.3))
                 predicted_high = max(predicted_open, predicted_close) * (
-                            1 + abs(np.random.normal(0, base_volatility * 0.5)))
+                        1 + abs(np.random.normal(0, base_volatility * 0.5)))
                 predicted_low = min(predicted_open, predicted_close) * (
-                            1 - abs(np.random.normal(0, base_volatility * 0.5)))
+                        1 - abs(np.random.normal(0, base_volatility * 0.5)))
 
                 # Create prediction
                 prediction = {
@@ -212,7 +372,8 @@ class StockPricePredictor:
                     "high": round(float(predicted_high), 2),
                     "low": round(float(predicted_low), 2),
                     "close": round(float(predicted_close), 2),
-                    "volume": int(latest_data['Volume'].mean())
+                    "volume": int(latest_data['Volume'].mean()),
+                    "note": "Prediction from simple statistical model (fallback)"
                 }
 
             # Add day's prediction to results
@@ -240,18 +401,22 @@ class StockPricePredictor:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Stock Price Prediction')
+    parser = argparse.ArgumentParser(description='Stock Price Prediction with iTransformer')
     parser.add_argument('--ticker', type=str, default="AAPL", help='Stock ticker symbol')
     parser.add_argument('--days', type=int, default=7, help='Number of days to predict')
     parser.add_argument('--api_key', type=str, default="S4J5OANDXEY87T9B", help='Alpha Vantage API key')
     parser.add_argument('--output_file', type=str, default=None, help='Output JSON file path')
+    parser.add_argument('--checkpoint', type=str,
+                        default="./checkpoints/stock_iTransformer_custom_M_ft365_sl48_ll7_pl512_dm8_nh2_el1_dl2048_df1_fctimeF_ebTrue_dttest_projection_0/checkpoint.pth",
+                        help='Path to model checkpoint file')
 
     args = parser.parse_args()
 
     predictor = StockPricePredictor(
         ticker=args.ticker,
         prediction_days=args.days,
-        api_key=args.api_key
+        api_key=args.api_key,
+        checkpoint_path=args.checkpoint
     )
 
     output_file, predictions = predictor.predict_to_json(args.output_file)
@@ -262,6 +427,7 @@ if __name__ == "__main__":
         if isinstance(day['open'], str) and "Market Closed" in day['open']:
             print(f"Date: {day['date']}, {day['open']}, Note: {day.get('note', '')}")
         else:
-            print(f"Date: {day['date']}, Open: ${day['open']:.2f}, Close: ${day['close']:.2f}")
+            print(
+                f"Date: {day['date']}, Open: ${day['open']:.2f}, Close: ${day['close']:.2f}, Note: {day.get('note', '')}")
     if len(predictions) > 3:
         print("...")

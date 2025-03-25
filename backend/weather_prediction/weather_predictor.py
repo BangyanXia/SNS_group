@@ -3,18 +3,28 @@ import pandas as pd
 import numpy as np
 import json
 import os
+import sys
+import torch
+import joblib
 from datetime import datetime, timedelta
-import random
+import matplotlib.pyplot as plt
+
+# Add current directory to system path to ensure modules can be imported
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 
 class WeatherPredictor:
-    def __init__(self, 
-                 city="Beijing", 
+    def __init__(self,
+                 city="Beijing",
                  country="CN",
                  days=7,
-                 api_key="YOUR_OPENWEATHERMAP_API_KEY"):
+                 api_key="YOUR_OPENWEATHERMAP_API_KEY",
+                 use_ml_model=True):
         """
         Initialize the Weather Predictor with the specified location.
-        
+
         Parameters:
         -----------
         city : str, default="Beijing"
@@ -25,64 +35,305 @@ class WeatherPredictor:
             Number of days to predict into the future
         api_key : str
             OpenWeatherMap API key for fetching weather data
+        use_ml_model : bool, default=True
+            Whether to use machine learning model for prediction (if available)
         """
         self.city = city
         self.country = country
         self.days = days
         self.api_key = api_key
         self.data_folder = "./data/weather"
-        
+        self.use_ml_model = use_ml_model
+
         # Create data directory if it doesn't exist
         if not os.path.exists(self.data_folder):
             os.makedirs(self.data_folder, exist_ok=True)
-    
+
+        # Check if ML model is available for this city
+        self.has_ml_model = False
+        if self.use_ml_model:
+            self.has_ml_model = self._check_ml_model_availability()
+
+    def _check_ml_model_availability(self):
+        """Check if ML model is available for this city"""
+        if self.city == "Beijing":
+            model_path = "Beijing/weather_lstm_model_B.pth"
+            x_test_path = "Beijing/X_test_tensor_B.pth"
+            scaler_path = "Beijing/scaler_y_B.pkl"
+            return os.path.exists(model_path) and os.path.exists(x_test_path) and os.path.exists(scaler_path)
+        elif self.city == "London":
+            model_path = "London/weather_lstm_model_L.pth"
+            x_test_path = "London/X_test_tensor_L.pth"
+            scaler_path = "London/scaler_y_L.pkl"
+            return os.path.exists(model_path) and os.path.exists(x_test_path) and os.path.exists(scaler_path)
+        return False
+
     def fetch_current_weather(self):
         """Fetch current weather data from OpenWeatherMap API"""
-        
+
         url = "https://api.openweathermap.org/data/2.5/weather"
         params = {
             "q": f"{self.city},{self.country}",
             "appid": self.api_key,
             "units": "metric"  # Use metric units (Celsius)
         }
-        
+
         file_name = f"{self.city}_{self.country}_current_weather_{datetime.now().strftime('%Y-%m-%d')}.json"
         file_path = os.path.join(self.data_folder, file_name)
-        
+
         if os.path.exists(file_path):
             print(f"Using existing current weather data for {self.city}")
             with open(file_path, 'r') as f:
                 return json.load(f)
-        
+
         try:
             print(f"Fetching current weather data for {self.city}...")
             response = requests.get(url, params=params)
             data = response.json()
-            
+
             if response.status_code != 200:
                 error_msg = f"API request failure: {data.get('message', 'Unknown error')}"
                 print(error_msg)
                 return None
-            
+
             # Save the response to file
             with open(file_path, 'w') as f:
                 json.dump(data, f, indent=4)
-                
+
             print(f"Current weather data has been saved to {file_name}")
             return data
         except Exception as e:
             print(f"Error fetching current weather: {str(e)}")
             return None
-    
+
+    def predict_with_ml_model(self):
+        """Use machine learning model for weather prediction"""
+        try:
+            print(f"Using ML model for {self.city} prediction...")
+
+            if self.city == "Beijing":
+                # Import Beijing model module
+                try:
+                    from Beijing.ModelTrain_Beijing import LSTMModel
+                except ImportError:
+                    print("Failed to import Beijing.ModelTrain_Beijing module, adjusting import path...")
+                    # If direct import fails, try adjusting path
+                    sys.path.append(os.path.join(current_dir, "Beijing"))
+                    from Beijing.ModelTrain_Beijing import LSTMModel
+
+                model_path = "Beijing/weather_lstm_model_B.pth"
+                x_test_path = "Beijing/X_test_tensor_B.pth"
+                scaler_path = "Beijing/scaler_y_B.pkl"
+                suffix = "B"
+            elif self.city == "London":
+                # Import London model module
+                try:
+                    from London.ModelTrain_London import LSTMModel
+                except ImportError:
+                    print("Failed to import London.ModelTrain_London module, adjusting import path...")
+                    # If direct import fails, try adjusting path
+                    sys.path.append(os.path.join(current_dir, "London"))
+                    from London.ModelTrain_London import LSTMModel
+
+                model_path = "London/weather_lstm_model_L.pth"
+                x_test_path = "London/X_test_tensor_L.pth"
+                scaler_path = "London/scaler_y_L.pkl"
+                suffix = "L"
+            else:
+                raise ValueError(f"No ML model available for {self.city}")
+
+            # Load model
+            model = LSTMModel(target_size=4)
+            model.load_state_dict(torch.load(model_path)['model_state_dict'])
+            model.eval()
+            print(f"Model loaded for {self.city}")
+
+            # Load test data
+            X_test = torch.load(x_test_path)
+            print(f"X_test loaded, shape: {X_test.shape}")
+
+            # Predict next days
+            X_input = X_test[-1].unsqueeze(0)  # Take the last day's data
+            future_preds = []
+
+            # Predict day by day
+            for _ in range(min(7, self.days)):  # Maximum 7 days
+                with torch.no_grad():
+                    y_pred = model(X_input).cpu().numpy()  # Predict 1 day
+                    future_preds.append(y_pred)
+
+                # Fill in missing features
+                y_pred_filled = np.zeros((1, 1, X_input.shape[2]))  # Shape (1, 1, feature_size)
+                y_pred_filled[:, :, -4:] = y_pred  # Only replace the last 4 target variables
+
+                # Convert to PyTorch Tensor
+                y_pred_tensor = torch.tensor(y_pred_filled, dtype=torch.float32)
+
+                # Concatenate dimensions
+                X_input = torch.cat((X_input[:, 1:, :], y_pred_tensor), dim=1)
+
+            # Convert predictions to numpy array
+            future_preds = np.array(future_preds).reshape(len(future_preds), 4)
+            print("Pre-inverse transform values:")
+            print(future_preds)
+
+            # Inverse transform
+            scaler_y = joblib.load(scaler_path)
+            future_preds = scaler_y.inverse_transform(future_preds)
+            print("Inverse transform complete")
+
+            print(
+                f"Weather prediction for next {len(future_preds)} days (temperature, humidity, wind speed, pressure):")
+            print(future_preds)
+
+            # Convert ML model predictions to standard format
+            forecast = self._convert_ml_predictions_to_forecast(future_preds)
+            return forecast
+
+        except Exception as e:
+            print(f"ML model prediction failed: {str(e)}")
+            print("Falling back to rule-based prediction method")
+            return None
+
+    def _convert_ml_predictions_to_forecast(self, predictions):
+        """Convert ML model predictions to standard forecast format"""
+        forecast = []
+        today = datetime.now()
+
+        # Weather condition mapping (simple rules based on temperature and humidity)
+        def get_weather_condition(temp, humidity):
+            if humidity > 80:
+                if temp < 0:
+                    return {"id": 600, "main": "Snow", "description": "light snow", "icon": "13d"}
+                else:
+                    return {"id": 500, "main": "Rain", "description": "light rain", "icon": "10d"}
+            elif humidity > 60:
+                return {"id": 803, "main": "Clouds", "description": "broken clouds", "icon": "04d"}
+            elif humidity > 40:
+                return {"id": 801, "main": "Clouds", "description": "few clouds", "icon": "02d"}
+            else:
+                return {"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}
+
+        for i in range(min(self.days, len(predictions))):
+            # Extract data from predictions
+            temp = predictions[i][0]  # Temperature
+            humidity = predictions[i][1]  # Humidity
+            wind_speed = predictions[i][2]  # Wind speed
+            pressure = predictions[i][3]  # Pressure
+
+            # Ensure values are in reasonable ranges
+            humidity = max(0, min(100, humidity))
+            wind_speed = max(0, wind_speed)
+            pressure = max(950, min(1050, pressure))
+
+            # Generate night temperature (fixed 6 degrees lower than day)
+            night_temp = temp - 6
+
+            # Determine weather condition
+            condition = get_weather_condition(temp, humidity)
+
+            # Calculate precipitation probability and amount based on humidity
+            if condition["main"] in ["Rain", "Snow"]:
+                precipitation_chance = min(100, max(60, humidity))
+                precipitation_amount = 5.0 if condition["main"] == "Rain" else 2.5
+            elif condition["main"] == "Clouds":
+                precipitation_chance = min(60, max(20, humidity - 20))
+                precipitation_amount = 1.0 if precipitation_chance > 40 else 0
+            else:
+                precipitation_chance = max(0, min(20, humidity - 40))
+                precipitation_amount = 0
+
+            # UV index removed as requested
+
+            # Forecast date
+            forecast_date = today + timedelta(days=i + 1)
+            date_str = forecast_date.strftime("%Y-%m-%d")
+
+            # Add to forecast
+            forecast.append({
+                "date": date_str,
+                "day_temp": round(temp, 1),
+                "night_temp": round(night_temp, 1),
+                "humidity": int(round(humidity)),
+                "wind_speed": round(wind_speed, 1),
+                "pressure": int(round(pressure)),
+                "weather_id": condition["id"],
+                "weather_main": condition["main"],
+                "weather_description": condition["description"],
+                "weather_icon": condition["icon"],
+                "precipitation_chance": int(round(precipitation_chance)),
+                "precipitation_amount": round(precipitation_amount, 1)
+            })
+
+        # If ML model predicted fewer days than requested, fill the rest with rule-based predictions
+        if len(predictions) < self.days:
+            # Use last prediction as a base for additional predictions
+            last_pred = forecast[-1]
+
+            for i in range(len(predictions), self.days):
+                forecast_date = today + timedelta(days=i + 1)
+                date_str = forecast_date.strftime("%Y-%m-%d")
+
+                # Use fixed values instead of random changes
+                day_temp = last_pred["day_temp"]  # No change
+                night_temp = day_temp - 6  # Fixed difference
+
+                # Fixed values for other parameters
+                humidity = last_pred["humidity"]
+                wind_speed = last_pred["wind_speed"]
+                pressure = last_pred["pressure"]
+
+                # Determine weather condition based on temperature and humidity
+                condition = get_weather_condition(day_temp, humidity)
+
+                # Precipitation probability and amount
+                if condition["main"] in ["Rain", "Snow"]:
+                    precipitation_chance = min(100, max(60, humidity))
+                    precipitation_amount = 5.0 if condition["main"] == "Rain" else 2.5
+                elif condition["main"] == "Clouds":
+                    precipitation_chance = min(60, max(20, humidity - 20))
+                    precipitation_amount = 1.0 if precipitation_chance > 40 else 0
+                else:
+                    precipitation_chance = max(0, min(20, humidity - 40))
+                    precipitation_amount = 0
+
+                # UV index removed as requested
+
+                # Add to forecast
+                forecast.append({
+                    "date": date_str,
+                    "day_temp": round(day_temp, 1),
+                    "night_temp": round(night_temp, 1),
+                    "humidity": int(round(humidity)),
+                    "wind_speed": round(wind_speed, 1),
+                    "pressure": int(round(pressure)),
+                    "weather_id": condition["id"],
+                    "weather_main": condition["main"],
+                    "weather_description": condition["description"],
+                    "weather_icon": condition["icon"],
+                    "precipitation_chance": int(round(precipitation_chance)),
+                    "precipitation_amount": round(precipitation_amount, 1),
+                    "prediction_method": "ML model extended prediction"
+                })
+
+        return forecast
+
     def predict(self):
         """Generate weather predictions based on current conditions and historical patterns"""
-        # Try to get current weather
+        # Check if ML model is available and user enabled ML prediction
+        if self.has_ml_model and self.use_ml_model:
+            ml_forecast = self.predict_with_ml_model()
+            if ml_forecast:
+                print("ML model prediction successful")
+                return ml_forecast
+
+        # If no ML model or ML prediction failed, try to get current weather and generate rule-based prediction
         current_weather = self.fetch_current_weather()
-        
-        # Use sample data if API request fails
+
+        # If API request fails, use sample data
         if current_weather is None:
             return self._generate_sample_forecast()
-        
+
         # Extract current conditions
         try:
             current_temp = current_weather['main']['temp']
@@ -97,11 +348,11 @@ class WeatherPredictor:
         except KeyError:
             # If we can't extract the data, use sample forecast
             return self._generate_sample_forecast()
-        
+
         # Generate forecast based on current conditions
         forecast = []
         today = datetime.now()
-        
+
         # Base weather codes for prediction
         weather_conditions = [
             {"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"},
@@ -114,91 +365,86 @@ class WeatherPredictor:
             {"id": 741, "main": "Fog", "description": "fog", "icon": "50d"},
             {"id": 701, "main": "Mist", "description": "mist", "icon": "50d"},
         ]
-        
+
         # Current season affects the forecast
         month = today.month
         is_summer = 5 <= month <= 8
         is_winter = month <= 2 or month == 12
-        
-        # Temperature ranges based on season (for northern hemisphere)
+
+        # Temperature changes based on season (for northern hemisphere)
         if is_summer:
-            temp_range = (2, 4)  # Summer has less variation
-            trend_range = (-1, 2)  # Generally warmer or stable
+            temp_change = 0.5  # Summer has less variation
+            trend_factor = 0.5  # Generally warmer
         elif is_winter:
-            temp_range = (4, 7)  # Winter has more variation
-            trend_range = (-2, 1)  # Generally cooler
+            temp_change = 0.5  # Winter has less variation
+            trend_factor = -0.5  # Generally cooler
         else:
-            temp_range = (3, 5)  # Spring/Fall moderate variation
-            trend_range = (-1.5, 1.5)  # Mixed trends
-        
+            temp_change = 0.5  # Spring/Fall moderate variation
+            trend_factor = 0  # Neutral trend
+
         # Generate forecast for each day
         for i in range(1, self.days + 1):
             # Date for this forecast
             forecast_date = today + timedelta(days=i)
             date_str = forecast_date.strftime("%Y-%m-%d")
-            
-            # Generate temperature with a trending component and random variation
+
+            # Day in forecast (0-indexed)
             day_in_forecast = i - 1
-            trend_factor = random.uniform(*trend_range)
-            temp_variation = random.uniform(*temp_range)
-            
+
             # Temperature forecast (with trend)
-            day_temp = current_temp + (trend_factor * day_in_forecast) + (temp_variation * (random.random() - 0.5))
-            night_temp = day_temp - random.uniform(5, 10)  # Nights are cooler
-            
+            day_temp = current_temp + (trend_factor * day_in_forecast) + (temp_change * (i % 2))  # Slight oscillation
+            night_temp = day_temp - 6  # Nights are cooler by fixed amount
+
             # Constrain temperatures to reasonable ranges
             day_temp = max(min(day_temp, 45), -30)  # Between -30°C and 45°C
             night_temp = max(min(night_temp, 40), -35)  # Between -35°C and 40°C
-            
-            # Weather condition (more likely to be similar to current and recent days)
-            weather_bias = random.random()
-            if day_in_forecast <= 2 and weather_bias < 0.7:
-                # First few days more likely similar to current
+
+            # Weather condition (deterministic pattern based on day in forecast)
+            day_mod = day_in_forecast % len(weather_conditions)
+
+            # First day more likely similar to current
+            if day_in_forecast == 0:
                 condition = next(
-                    (w for w in weather_conditions if w["id"] // 100 == current_weather_id // 100), 
-                    random.choice(weather_conditions)
+                    (w for w in weather_conditions if w["id"] // 100 == current_weather_id // 100),
+                    weather_conditions[0]
                 )
-            else:
-                # Random conditions, but weighted by season
-                if is_summer and random.random() < 0.7:
-                    # Summer: more clear/clouds, some rain, rare snow
-                    condition = random.choice([w for w in weather_conditions if w["id"] != 600])
-                elif is_winter and random.random() < 0.6:
-                    # Winter: more clouds, fog, snow, less clear
-                    winter_conditions = [w for w in weather_conditions if w["id"] != 800 or random.random() < 0.3]
-                    condition = random.choice(winter_conditions)
+            # Seasonal patterns
+            elif is_summer:
+                # Summer: more clear/clouds, some rain, no snow
+                condition_idx = day_mod % (len(weather_conditions) - 1)  # Skip snow
+                condition = weather_conditions[condition_idx]
+            elif is_winter:
+                # Winter: more clouds, fog, snow, less clear
+                if day_mod == 0:  # Replace clear with clouds
+                    condition = weather_conditions[3]  # Broken clouds
                 else:
-                    # Any season, any condition
-                    condition = random.choice(weather_conditions)
-            
+                    condition = weather_conditions[day_mod]
+            else:
+                # Regular pattern
+                condition = weather_conditions[day_mod]
+
             # Humidity based on weather (higher for rain/snow/fog)
             if condition["id"] in [500, 501, 600, 741, 701]:
-                humidity = random.randint(70, 95)
+                humidity = 80
             else:
-                humidity = random.randint(40, 80)
-            
-            # Wind speed - slight variation from current
-            wind_speed = max(0, current_wind_speed + random.uniform(-2, 2))
-            
+                humidity = 60
+
+            # Wind speed - fixed value based on current
+            wind_speed = current_wind_speed
+
             # Chance of precipitation based on weather
             if condition["main"] in ["Rain", "Snow"]:
-                precipitation_chance = random.randint(60, 100)
-                precipitation_amount = random.uniform(0.5, 10.0) if condition["main"] == "Rain" else random.uniform(0.5, 5.0)
+                precipitation_chance = 80
+                precipitation_amount = 5.0 if condition["main"] == "Rain" else 3.0
             elif condition["main"] in ["Clouds", "Fog", "Mist"]:
-                precipitation_chance = random.randint(20, 60)
-                precipitation_amount = random.uniform(0, 2.0)
+                precipitation_chance = 40
+                precipitation_amount = 1.0
             else:
-                precipitation_chance = random.randint(0, 20)
+                precipitation_chance = 10
                 precipitation_amount = 0
-            
-            # UV index (higher in summer, clear days)
-            if condition["main"] == "Clear" and is_summer:
-                uv_index = random.randint(6, 11)
-            elif condition["main"] == "Clear":
-                uv_index = random.randint(3, 7)
-            else:
-                uv_index = random.randint(0, 4)
-            
+
+            # UV index removed as requested
+
             # Add to forecast
             forecast.append({
                 "date": date_str,
@@ -206,37 +452,31 @@ class WeatherPredictor:
                 "night_temp": round(night_temp, 1),
                 "humidity": humidity,
                 "wind_speed": round(wind_speed, 1),
-                "pressure": current_pressure + random.randint(-5, 5),
+                "pressure": current_pressure,
                 "weather_id": condition["id"],
                 "weather_main": condition["main"],
                 "weather_description": condition["description"],
                 "weather_icon": condition["icon"],
                 "precipitation_chance": precipitation_chance,
-                "precipitation_amount": round(precipitation_amount, 1),
-                "uv_index": uv_index
+                "precipitation_amount": round(precipitation_amount, 1)
             })
-        
+
         return forecast
-    
+
     def _generate_sample_forecast(self):
         """Generate sample weather forecast when API data is unavailable"""
         forecast = []
         today = datetime.now()
-        
-        # City-based temperature ranges (approximations)
+
+        # City-based temperature values (fixed values instead of ranges)
         city_temp_map = {
-            "Beijing": {"summer": (25, 35), "winter": (-5, 10), "other": (10, 25)},
-            "London": {"summer": (15, 25), "winter": (0, 10), "other": (5, 20)},
-            "New York": {"summer": (20, 32), "winter": (-5, 5), "other": (5, 20)},
-            "Tokyo": {"summer": (25, 35), "winter": (5, 15), "other": (10, 25)},
-            "Sydney": {"summer": (25, 35), "winter": (10, 20), "other": (15, 25)},
-            "Moscow": {"summer": (15, 30), "winter": (-15, 0), "other": (0, 15)},
-            "Cairo": {"summer": (30, 40), "winter": (15, 25), "other": (20, 30)}
+            "Beijing": {"summer": 30, "winter": 5, "other": 18},
+            "London": {"summer": 20, "winter": 5, "other": 12},
         }
-        
-        # Use provided city or default to Beijing's range
+
+        # Use provided city or default to Beijing's values
         city_temps = city_temp_map.get(self.city, city_temp_map["Beijing"])
-        
+
         # Determine season (based on northern hemisphere, except for Sydney)
         month = today.month
         if self.city == "Sydney":  # Southern hemisphere
@@ -245,15 +485,15 @@ class WeatherPredictor:
         else:  # Northern hemisphere
             is_summer = 6 <= month <= 8
             is_winter = month <= 2 or month == 12
-        
-        # Select temperature range based on season
+
+        # Select temperature based on season
         if is_summer:
-            temp_range = city_temps["summer"]
+            base_temp = city_temps["summer"]
         elif is_winter:
-            temp_range = city_temps["winter"]
+            base_temp = city_temps["winter"]
         else:
-            temp_range = city_temps["other"]
-        
+            base_temp = city_temps["other"]
+
         # Weather conditions for sampling
         weather_conditions = [
             {"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"},
@@ -266,115 +506,161 @@ class WeatherPredictor:
             {"id": 741, "main": "Fog", "description": "fog", "icon": "50d"},
             {"id": 701, "main": "Mist", "description": "mist", "icon": "50d"},
         ]
-        
+
         # Generate sample forecast for each day
         for i in range(1, self.days + 1):
             # Date for this forecast
             forecast_date = today + timedelta(days=i)
             date_str = forecast_date.strftime("%Y-%m-%d")
-            
-            # Base temperature on range for the city/season
-            base_temp = random.uniform(temp_range[0], temp_range[1])
-            
-            # Add some continuity between days (trend)
-            if i > 1:
-                prev_day = forecast[-1]
-                trend_factor = 0.7  # How much previous day influences the next
-                base_temp = (base_temp + trend_factor * prev_day["day_temp"]) / (1 + trend_factor)
-            
-            # Day and night temperatures
-            day_temp = base_temp + random.uniform(-2, 2)
-            night_temp = day_temp - random.uniform(5, 10)  # Nights are cooler
-            
-            # Select weather condition appropriate for the season
-            if is_winter and random.random() < 0.7:
-                # More clouds, fog, snow in winter
-                condition = random.choice([
-                    w for w in weather_conditions 
-                    if w["id"] in [600, 801, 802, 803, 741, 701]
-                ])
-            elif is_summer and random.random() < 0.7:
-                # More clear, few clouds, occasional rain in summer
-                condition = random.choice([
-                    w for w in weather_conditions 
-                    if w["id"] in [800, 801, 500]
-                ])
+
+            # Temperature with slight oscillation but no randomness
+            day_temp = base_temp + (0.5 * (i % 2))
+            night_temp = day_temp - 6  # Nights are cooler by fixed amount
+
+            # Select weather condition based on deterministic pattern
+            day_mod = (i - 1) % len(weather_conditions)
+
+            # Apply seasonal adjustments to pattern
+            if is_winter and day_mod == 0:  # Replace clear with snow in winter
+                condition = weather_conditions[6]  # Snow
+            elif is_summer and day_mod == 6:  # Replace snow with clear in summer
+                condition = weather_conditions[0]  # Clear
             else:
-                # Any condition
-                condition = random.choice(weather_conditions)
-            
-            # Weather dependent values
+                condition = weather_conditions[day_mod]
+
+            # Weather dependent values (fixed)
             if condition["main"] in ["Rain", "Snow"]:
-                humidity = random.randint(70, 95)
-                precipitation_chance = random.randint(60, 100)
-                precipitation_amount = random.uniform(0.5, 15) if condition["main"] == "Rain" else random.uniform(1, 8)
+                humidity = 80
+                precipitation_chance = 80
+                precipitation_amount = 5 if condition["main"] == "Rain" else 3
             elif condition["main"] in ["Clouds", "Fog", "Mist"]:
-                humidity = random.randint(60, 85)
-                precipitation_chance = random.randint(20, 60)
-                precipitation_amount = random.uniform(0, 1)
+                humidity = 70
+                precipitation_chance = 40
+                precipitation_amount = 0.5
             else:
-                humidity = random.randint(30, 70)
-                precipitation_chance = random.randint(0, 20)
+                humidity = 50
+                precipitation_chance = 10
                 precipitation_amount = 0
-            
+
             # Add day to forecast
             forecast.append({
                 "date": date_str,
                 "day_temp": round(day_temp, 1),
                 "night_temp": round(night_temp, 1),
                 "humidity": humidity,
-                "wind_speed": round(random.uniform(0, 15), 1),
-                "pressure": random.randint(990, 1030),
+                "wind_speed": 5.0,  # Fixed wind speed
+                "pressure": 1010,  # Fixed pressure
                 "weather_id": condition["id"],
                 "weather_main": condition["main"],
                 "weather_description": condition["description"],
                 "weather_icon": condition["icon"],
                 "precipitation_chance": precipitation_chance,
-                "precipitation_amount": round(precipitation_amount, 1),
-                "uv_index": random.randint(0, 11)
+                "precipitation_amount": precipitation_amount
             })
-        
+
         return forecast
-    
+
     def predict_to_json(self, output_file=None):
         """Run prediction and save results to JSON file"""
         predictions = self.predict()
-        
+
         if output_file is None:
             output_file = f"{self.city}_{self.country}_weather_forecast_{datetime.now().strftime('%Y-%m-%d')}.json"
-        
+
         with open(output_file, 'w') as f:
             json.dump(predictions, f, indent=4)
-            
+
         print(f"Weather forecast saved to {output_file}")
         return output_file, predictions
 
+    def visualize_forecast(self, predictions=None):
+        """Generate visualization of the forecast"""
+        if predictions is None:
+            predictions = self.predict()
 
-# Example usage
+        # Extract data for plotting
+        dates = [day["date"] for day in predictions]
+        temps_day = [day["day_temp"] for day in predictions]
+        temps_night = [day["night_temp"] for day in predictions]
+        humidity = [day["humidity"] for day in predictions]
+        pressure = [day["pressure"] for day in predictions]
+        wind_speed = [day["wind_speed"] for day in predictions]
+        precip_chance = [day["precipitation_chance"] for day in predictions]
+
+        # Create a figure with subplots
+        fig, axs = plt.subplots(3, 1, figsize=(12, 12))
+
+        # Temperature subplot
+        axs[0].plot(dates, temps_day, 'ro-', label='Day Temperature (°C)')
+        axs[0].plot(dates, temps_night, 'bo-', label='Night Temperature (°C)')
+        axs[0].set_title(f'{self.city} Temperature Forecast')
+        axs[0].set_ylabel('Temperature (°C)')
+        axs[0].grid(True)
+        axs[0].legend()
+
+        # Humidity and Precipitation subplot
+        axs[1].plot(dates, humidity, 'go-', label='Humidity (%)')
+        axs[1].set_ylabel('Humidity (%)')
+        axs[1].grid(True)
+        ax2 = axs[1].twinx()
+        ax2.plot(dates, precip_chance, 'co-', label='Precipitation Chance (%)')
+        ax2.set_ylabel('Precipitation Chance (%)')
+        axs[1].set_title(f'{self.city} Humidity and Precipitation Forecast')
+        lines1, labels1 = axs[1].get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        axs[1].legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+        # Wind and Pressure subplot
+        axs[2].plot(dates, wind_speed, 'mo-', label='Wind Speed (m/s)')
+        axs[2].set_ylabel('Wind Speed (m/s)')
+        axs[2].grid(True)
+        ax3 = axs[2].twinx()
+        ax3.plot(dates, pressure, 'yo-', label='Pressure (hPa)')
+        ax3.set_ylabel('Pressure (hPa)')
+        axs[2].set_title(f'{self.city} Wind and Pressure Forecast')
+        lines1, labels1 = axs[2].get_legend_handles_labels()
+        lines2, labels2 = ax3.get_legend_handles_labels()
+        axs[2].legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+        # Format x-axis for all subplots
+        for ax in axs:
+            ax.set_xlabel('Date')
+            plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+
+        plt.tight_layout()
+        plt.show()
+
+        return fig
+
+
 if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Weather Forecast')
-    parser.add_argument('--city', type=str, default="Beijing", help='City name')
-    parser.add_argument('--country', type=str, default="CN", help='Country code (ISO 3166)')
-    parser.add_argument('--days', type=int, default=7, help='Number of days to forecast')
-    parser.add_argument('--api_key', type=str, default="YOUR_OPENWEATHERMAP_API_KEY", help='OpenWeatherMap API key')
-    parser.add_argument('--output_file', type=str, default=None, help='Output JSON file path')
-    
-    args = parser.parse_args()
-    
-    predictor = WeatherPredictor(
-        city=args.city,
-        country=args.country,
-        days=args.days,
-        api_key=args.api_key
+    # 预测北京天气
+    print("Generating forecast for Beijing...")
+    beijing_predictor = WeatherPredictor(
+        city="Beijing",
+        country="CN",
+        days=7,
+        use_ml_model=True
     )
-    
-    output_file, predictions = predictor.predict_to_json(args.output_file)
-    
-    # Print sample of results
-    print("\nForecast Sample:")
-    for day in predictions[:3]:  # Show first 3 days
-        print(f"Date: {day['date']}, Weather: {day['weather_main']}, Temp: {day['day_temp']}°C/{day['night_temp']}°C")
-    if len(predictions) > 3:
-        print("...")
+    beijing_file, beijing_predictions = beijing_predictor.predict_to_json()
+
+    print(f"\nBeijing forecast saved to: {beijing_file}")
+    print("Summary: ", end="")
+    print(
+        f"Day 1: {beijing_predictions[0]['day_temp']}°C/{beijing_predictions[0]['night_temp']}°C")
+
+    print("\nGenerating forecast for London...")
+    london_predictor = WeatherPredictor(
+        city="London",
+        country="GB",
+        days=7,
+        use_ml_model=True
+    )
+    london_file, london_predictions = london_predictor.predict_to_json()
+
+    print(f"\nLondon forecast saved to: {london_file}")
+    print("Summary: ", end="")
+    print(
+        f"Day 1: {london_predictions[0]['day_temp']}°C/{london_predictions[0]['night_temp']}°C")
+
+    print("\nForecasts for both cities completed successfully!")

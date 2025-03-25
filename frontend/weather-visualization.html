@@ -259,21 +259,12 @@
         .forecast-details span:first-child {
             font-weight: 500;
         }
-        .uv-low {
-            color: #2ecc71;
-        }
-        .uv-moderate {
-            color: #f39c12;
-        }
-        .uv-high {
-            color: #e74c3c;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Weather Forecast Visualization</h1>
-        
+
         <div class="card">
             <div class="controls">
                 <div class="location-input">
@@ -300,7 +291,7 @@
                 <button class="tab-button" data-tab="statsTab">Statistics</button>
                 <button class="tab-button" data-tab="tableTab">Data Table</button>
             </div>
-            
+
             <div id="forecastTab" class="tab-content active">
                 <div class="card">
                     <h2>7-Day Weather Forecast</h2>
@@ -309,7 +300,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="temperatureTab" class="tab-content">
                 <div class="card">
                     <h2>Temperature Forecast</h2>
@@ -318,7 +309,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="precipitationTab" class="tab-content">
                 <div class="card">
                     <h2>Precipitation Chance & Amount</h2>
@@ -327,7 +318,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="statsTab" class="tab-content">
                 <div class="card">
                     <h2>Forecast Statistics</h2>
@@ -359,7 +350,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="tableTab" class="tab-content">
                 <div class="card">
                     <h2>Detailed Forecast Data</h2>
@@ -375,7 +366,6 @@
                                     <th>Wind</th>
                                     <th>Precip. Chance</th>
                                     <th>Precip. Amount</th>
-                                    <th>UV Index</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -394,71 +384,71 @@
         let precipitationChart = null;
         let forecastData = null;
         const API_ENDPOINT = "/api/weather-forecast";  // Backend API endpoint
-        
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', () => {
             // Get city input and load button
             const cityInput = document.getElementById('cityInput');
             const countryInput = document.getElementById('countryInput');
             const loadButton = document.getElementById('loadButton');
-            
+
             // Bind load button
             loadButton.addEventListener('click', () => {
                 const city = cityInput.value.trim();
                 const country = countryInput.value.trim().toUpperCase();
-                
+
                 if (city && country) {
                     fetchWeatherData(city, country);
                 } else {
                     showError('Please enter a valid city and country code');
                 }
             });
-            
+
             // Bind tab switching
             document.querySelectorAll('.tab-button').forEach(button => {
                 button.addEventListener('click', () => {
                     // Remove all active classes
                     document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
                     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-                    
+
                     // Add active class to clicked button and corresponding content
                     button.classList.add('active');
                     const tabId = button.getAttribute('data-tab');
                     document.getElementById(tabId).classList.add('active');
                 });
             });
-            
+
             // Initial data load (default: Beijing, CN)
             fetchWeatherData('Beijing', 'CN');
         });
-        
+
         // Show error message
         function showError(message) {
             const errorMessage = document.getElementById('errorMessage');
             errorMessage.textContent = message;
             errorMessage.style.display = 'block';
         }
-        
+
         // Hide error message
         function hideError() {
             document.getElementById('errorMessage').style.display = 'none';
         }
-        
+
         // Show loading spinner
         function showLoading() {
             document.getElementById('loading').style.display = 'block';
         }
-        
+
         // Hide loading spinner
         function hideLoading() {
             document.getElementById('loading').style.display = 'none';
         }
-        
+
         // Fetch weather data from backend
         function fetchWeatherData(city, country) {
             hideError();
             showLoading();
-            
+
             // Use API with city and country parameters
             fetch(`${API_ENDPOINT}?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}`)
                 .then(response => {
@@ -472,10 +462,10 @@
                     if (!Array.isArray(data) || data.length === 0 || !isValidWeatherData(data[0])) {
                         throw new Error('Invalid data format');
                     }
-                    
+
                     // Process the data
                     processWeatherData(data, city, country);
-                    
+
                     // Update last refresh time
                     updateRefreshTime();
                 })
@@ -487,7 +477,7 @@
                     hideLoading();
                 });
         }
-        
+
         // Update refresh time
         function updateRefreshTime() {
             const now = new Date();
@@ -498,44 +488,44 @@
                 hour: '2-digit',
                 minute: '2-digit'
             }).format(now);
-            
+
             document.getElementById('updateTime').textContent = `Last updated: ${formattedTime}`;
         }
-        
+
         // Check if weather data is valid
         function isValidWeatherData(item) {
-            return item && 
-                   typeof item.date === 'string' && 
-                   typeof item.day_temp === 'number' && 
-                   typeof item.night_temp === 'number' && 
+            return item &&
+                   typeof item.date === 'string' &&
+                   typeof item.day_temp === 'number' &&
+                   typeof item.night_temp === 'number' &&
                    typeof item.humidity === 'number' &&
                    typeof item.wind_speed === 'number' &&
                    typeof item.weather_main === 'string';
         }
-        
+
         // Process weather data
         function processWeatherData(data, city, country) {
             forecastData = data;
-            
+
             // Update forecast cards
             updateForecastCards(data, city);
-            
+
             // Update charts
             createTemperatureChart(data, city);
             createPrecipitationChart(data, city);
-            
+
             // Update statistics
             updateStats(data);
-            
+
             // Update table
             updateTable(data);
         }
-        
+
         // Update forecast cards
         function updateForecastCards(data, city) {
             const cardsContainer = document.getElementById('forecastCards');
             cardsContainer.innerHTML = '';
-            
+
             data.forEach(day => {
                 // Format date
                 const date = new Date(day.date);
@@ -544,18 +534,10 @@
                     month: 'short',
                     day: 'numeric'
                 }).format(date);
-                
+
                 // Weather icon - using OpenWeatherMap icons
                 const iconUrl = `https://openweathermap.org/img/wn/${day.weather_icon}@2x.png`;
-                
-                // UV index class
-                let uvClass = 'uv-low';
-                if (day.uv_index >= 6 && day.uv_index <= 7) {
-                    uvClass = 'uv-moderate';
-                } else if (day.uv_index >= 8) {
-                    uvClass = 'uv-high';
-                }
-                
+
                 // Create card
                 const card = document.createElement('div');
                 card.className = 'forecast-day';
@@ -568,27 +550,26 @@
                         <div><span>Humidity:</span> <span>${day.humidity}%</span></div>
                         <div><span>Wind:</span> <span>${day.wind_speed} m/s</span></div>
                         <div><span>Precip:</span> <span>${day.precipitation_chance}%</span></div>
-                        <div><span>UV:</span> <span class="${uvClass}">${day.uv_index}</span></div>
                     </div>
                 `;
-                
+
                 cardsContainer.appendChild(card);
             });
         }
-        
+
         // Create temperature chart
         function createTemperatureChart(data, city) {
             const ctx = document.getElementById('temperatureChart').getContext('2d');
-            
+
             // Destroy old chart if exists
             if (temperatureChart) {
                 temperatureChart.destroy();
             }
-            
+
             const dates = data.map(item => item.date);
             const dayTemps = data.map(item => item.day_temp);
             const nightTemps = data.map(item => item.night_temp);
-            
+
             temperatureChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -671,20 +652,20 @@
                 }
             });
         }
-        
+
         // Create precipitation chart
         function createPrecipitationChart(data, city) {
             const ctx = document.getElementById('precipitationChart').getContext('2d');
-            
+
             // Destroy old chart if exists
             if (precipitationChart) {
                 precipitationChart.destroy();
             }
-            
+
             const dates = data.map(item => item.date);
             const precipChance = data.map(item => item.precipitation_chance);
             const precipAmount = data.map(item => item.precipitation_amount);
-            
+
             precipitationChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -777,25 +758,25 @@
                 }
             });
         }
-        
+
         // Update statistics
         function updateStats(data) {
             // Calculate average temperatures
             const avgDayTemp = data.reduce((sum, item) => sum + item.day_temp, 0) / data.length;
             const avgNightTemp = data.reduce((sum, item) => sum + item.night_temp, 0) / data.length;
-            
+
             // Find max and min temperatures
             const maxTemp = Math.max(...data.map(item => item.day_temp));
             const minTemp = Math.min(...data.map(item => item.night_temp));
-            
+
             // Count rain days and calculate total precipitation
-            const rainDays = data.filter(item => 
-                item.weather_main === 'Rain' || 
+            const rainDays = data.filter(item =>
+                item.weather_main === 'Rain' ||
                 item.precipitation_amount > 0.5
             ).length;
-            
+
             const totalPrecipitation = data.reduce((sum, item) => sum + item.precipitation_amount, 0);
-            
+
             // Update statistic cards
             document.getElementById('avgDayTemp').textContent = `${avgDayTemp.toFixed(1)}°C`;
             document.getElementById('avgNightTemp').textContent = `${avgNightTemp.toFixed(1)}°C`;
@@ -804,12 +785,12 @@
             document.getElementById('rainDays').textContent = rainDays;
             document.getElementById('totalPrecipitation').textContent = `${totalPrecipitation.toFixed(1)} mm`;
         }
-        
+
         // Update table
         function updateTable(data) {
             const tableBody = document.querySelector('#forecastTable tbody');
             tableBody.innerHTML = '';
-            
+
             data.forEach(day => {
                 // Format date
                 const date = new Date(day.date);
@@ -818,15 +799,7 @@
                     month: 'short',
                     day: 'numeric'
                 }).format(date);
-                
-                // UV index class
-                let uvClass = 'uv-low';
-                if (day.uv_index >= 6 && day.uv_index <= 7) {
-                    uvClass = 'uv-moderate';
-                } else if (day.uv_index >= 8) {
-                    uvClass = 'uv-high';
-                }
-                
+
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${formattedDate}</td>
@@ -837,9 +810,8 @@
                     <td>${day.wind_speed.toFixed(1)} m/s</td>
                     <td>${day.precipitation_chance}%</td>
                     <td>${day.precipitation_amount.toFixed(1)} mm</td>
-                    <td class="${uvClass}">${day.uv_index}</td>
                 `;
-                
+
                 tableBody.appendChild(row);
             });
         }

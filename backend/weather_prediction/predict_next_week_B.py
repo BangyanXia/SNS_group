@@ -1,19 +1,21 @@
 import torch
+import sys,os
 import numpy as np
 import matplotlib.pyplot as plt
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from Beijing.ModelTrain_Beijing import LSTMModel
 import joblib
 
 
 # 1️⃣ 加载训练好的模型
-model_path = "weather_lstm_model_B.pth"
+model_path = "Beijing/weather_lstm_model_B.pth"
 model = LSTMModel(target_size=4)
 model.load_state_dict(torch.load(model_path)['model_state_dict'])
 model.eval()
 print("✅ 已加载训练好的模型")
 
 # 2️⃣ 加载 X_test
-X_test = torch.load("X_test_tensor_B.pth")
+X_test = torch.load("Beijing/X_test_tensor_B.pth")
 print("✅ 成功加载 X_test，形状:", X_test.shape)
 
 # 3️⃣ 预测未来 7 天
@@ -46,7 +48,7 @@ print("🔍 反归一化前（模型输出的归一化值）:")
 print(future_preds)  # 确保 shape = (7, 4)
 
 # ✅ 反归一化
-scaler_y = joblib.load("scaler_y_B.pkl")
+scaler_y = joblib.load("Beijing/scaler_y_B.pkl")
 
 future_preds = scaler_y.inverse_transform(future_preds)
 print("✅ 反归一化完成")
