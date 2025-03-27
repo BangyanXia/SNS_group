@@ -10,7 +10,6 @@ import pandas as pd
 from datetime import datetime
 
 if __name__ == '__main__':
-    # Call the alpha vantage API to get the data set.
     API_KEY = 'S4J5OANDXEY87T9B'
     URL = "https://www.alphavantage.co/query"
     params = {
