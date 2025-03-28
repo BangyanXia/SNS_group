@@ -1,4 +1,4 @@
-# Forecast Assistant
+# Oracle forecast chatbot
 
 A comprehensive forecasting chatbot that provides predictions for weather, stock prices, and exchange rates using machine learning models.
 
