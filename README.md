@@ -39,7 +39,7 @@ The system uses machine learning models (iTransformer architecture) to analyze h
 - History tracking of recent searches
 
 ## Project Structure
-
+### Directory layout 
 ```
 ├── backend/
 │   ├── flask-backend.py                # Main Flask server
@@ -57,6 +57,8 @@ The system uses machine learning models (iTransformer architecture) to analyze h
 │   ├── stock-price-visualization.html   # Stock price visualization
 │   └── weather-visualization.html       # Weather visualization
 ```
+### System Architecture
+![Project Architecture](/system_architecture.png)
 
 ## Technologies Used
 
